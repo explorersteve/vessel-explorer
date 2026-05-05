@@ -1,6 +1,6 @@
 # Vessel Explorer
 
-A read-only explorer for [THE_VESSEL](https://etherscan.io/address/0xECb92Cc7112b80A2234936315BbB493fb48d1463), an on-chain storage protocol on Ethereum by [@stephensantoro_](https://x.com/stephensantoro_) and [@producedbydav](https://x.com/producedbydav). Browse vessels (capsules, vaults, and machines), view pixel-rendered payloads, inspect raw bytes, detect content types (SVG, HTML, bytecode), and explore holder leaderboards — all read directly from the blockchain.
+A read-only explorer for [THE_VESSEL](https://evm.now/address/0xECb92Cc7112b80A2234936315BbB493fb48d1463), an on-chain storage protocol on Ethereum by [@stephensantoro_](https://x.com/stephensantoro_) and [@producedbydav](https://x.com/producedbydav). Browse vessels (capsules, vaults, and machines), view pixel-rendered payloads, inspect raw bytes, detect content types (SVG, HTML, bytecode), and explore holder leaderboards — all read directly from the blockchain.
 
 ## Tech Stack
 
@@ -73,7 +73,7 @@ frontend/
       PixelRender.vue         # simple pixel render via data URL
       ContentView.vue         # content viewer (text, SVG, HTML with [run], bytecode hex dump)
       HexDump.vue             # raw hex dump
-      AddressDisplay.vue      # address with ENS resolution + etherscan links
+      AddressDisplay.vue      # address with ENS resolution + EVM.NOW links
     composables/
       useVesselReader.ts      # reads vessel metadata, payload, entries from contract
       useOwnership.ts         # transfer replay to compute current ownership
@@ -102,9 +102,9 @@ frontend/
 
 ## Key Contracts
 
-- **THE_VESSEL**: [`0xECb92Cc7112b80A2234936315BbB493fb48d1463`](https://etherscan.io/address/0xECb92Cc7112b80A2234936315BbB493fb48d1463)
-- **Renderer**: [`0x85c7D2933f178A02Ee9AAC0E654094EaDAca48a2`](https://etherscan.io/address/0x85c7D2933f178A02Ee9AAC0E654094EaDAca48a2)
-- **Sequences (ERC1155)**: [`0x9423548a957284eD17E55c37c4B6D96e5E63065f`](https://etherscan.io/address/0x9423548a957284eD17E55c37c4B6D96e5E63065f)
+- **THE_VESSEL**: [`0xECb92Cc7112b80A2234936315BbB493fb48d1463`](https://evm.now/address/0xECb92Cc7112b80A2234936315BbB493fb48d1463)
+- **Renderer**: [`0x85c7D2933f178A02Ee9AAC0E654094EaDAca48a2`](https://evm.now/address/0x85c7D2933f178A02Ee9AAC0E654094EaDAca48a2)
+- **Sequences (ERC1155)**: [`0x9423548a957284eD17E55c37c4B6D96e5E63065f`](https://evm.now/address/0x9423548a957284eD17E55c37c4B6D96e5E63065f)
 
 ## Vessel Types
 

@@ -1,5 +1,5 @@
 <template>
-  <a v-if="external" :href="`${ETHERSCAN_BASE}/address/${address}`" target="_blank" rel="noopener" class="address-display">
+  <a v-if="external" :href="`${EXPLORER_BASE}/address/${address}`" target="_blank" rel="noopener" class="address-display">
     <template v-if="ens?.ens">{{ ens.ens }}</template>
     <template v-else>{{ shortened }}</template>
   </a>
@@ -10,7 +10,7 @@
 </template>
 
 <script setup lang="ts">
-import { ETHERSCAN_BASE, shortenAddress } from '~/utils/vessel'
+import { EXPLORER_BASE, shortenAddress } from '~/utils/vessel'
 
 const props = withDefaults(defineProps<{
   address: string

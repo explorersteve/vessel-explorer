@@ -98,10 +98,10 @@
               <AddressDisplay :address="tx.from" />
             </span>
             <a
-              :href="`${ETHERSCAN_BASE}/tx/${tx.hash}`"
+              :href="`${EXPLORER_BASE}/tx/${tx.hash}`"
               target="_blank"
               rel="noopener"
-              class="col-time etherscan-link"
+              class="col-time explorer-link"
             >
               {{ formatTime(tx.timeStamp) }}
             </a>
@@ -129,7 +129,7 @@
 import { readContract } from '@wagmi/core'
 import { useConfig } from '@wagmi/vue'
 import { fetchVesselActivity, type VesselTransaction } from '~/utils/etherscan'
-import { VESSEL_ADDRESS, VESSEL_ABI, ETHERSCAN_BASE, hexToBytes, renderToCanvas, type ColorMode } from '~/utils/vessel'
+import { VESSEL_ADDRESS, VESSEL_ABI, EXPLORER_BASE, hexToBytes, renderToCanvas, type ColorMode } from '~/utils/vessel'
 import { fetchOwnership } from '~/composables/useOwnership'
 
 const router = useRouter()
@@ -636,7 +636,7 @@ onMounted(async () => {
   }
 }
 
-.etherscan-link {
+.explorer-link {
   color: var(--text-faint);
   text-decoration: none;
 
