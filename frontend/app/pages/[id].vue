@@ -110,6 +110,64 @@
           v-if="activePayload?.length && contentType !== 'binary'"
           :data="activePayload"
         />
+
+        <section class="write-history">
+          <div class="section-header">
+            <span>write history</span>
+            <span class="section-count">{{ writeCountLabel }}</span>
+          </div>
+
+          <div v-if="writesLoading" class="status">loading writes...</div>
+          <div v-else-if="writesError" class="status status-error">{{ writesError }}</div>
+          <div v-else-if="!writeRows.length" class="status">no indexed writes</div>
+
+          <div v-else class="write-list">
+            <article v-for="write in writeRows" :key="write.id" class="write-row">
+              <div class="write-row-main">
+                <span class="write-bytes">{{ formatBytes(write.payloadBytes) }}</span>
+                <span v-if="write.entryIndex !== null" class="write-entry">entry {{ write.entryIndex }}</span>
+                <span class="write-time">{{ formatWriteTime(write.timestamp) }}</span>
+              </div>
+
+              <div class="write-row-meta">
+                <span v-if="write.writer">
+                  writer <AddressDisplay :address="write.writer" />
+                </span>
+                <a
+                  :href="`${EXPLORER_BASE}/tx/${write.txHash}`"
+                  target="_blank"
+                  rel="noopener"
+                  class="explorer-link"
+                >
+                  {{ shortHash(write.txHash) }}
+                </a>
+                <span>block {{ write.blockNumber }}</span>
+              </div>
+
+              <code class="write-hex">{{ compactHex(write.payloadHex) }}</code>
+            </article>
+          </div>
+
+          <div v-if="writeTotalPages > 1" class="write-pagination">
+            <button
+              type="button"
+              class="text-btn"
+              :disabled="writesPage <= 1 || writesLoading"
+              @click="loadWrites(writesPage - 1)"
+            >
+              [newer]
+            </button>
+            <span>{{ writesPage }} / {{ writeTotalPages }}</span>
+            <button
+              type="button"
+              class="text-btn"
+              :disabled="writesPage >= writeTotalPages || writesLoading"
+              @click="loadWrites(writesPage + 1)"
+            >
+              [older]
+            </button>
+          </div>
+        </section>
       </div>
       </Transition>
     </div>
@@ -118,7 +176,29 @@
 
 <script setup lang="ts">
 import { detectContent } from '~/utils/content'
-import { colorModeName } from '~/utils/vessel'
+import { EXPLORER_BASE, colorModeName } from '~/utils/vessel'
+
+interface PayloadWrite {
+  id: string
+  tokenId: string
+  entryIndex: number | null
+  payloadHex: string
+  payloadBytes: number
+  writer: string | null
+  txHash: string
+  blockNumber: string
+  logIndex: number | null
+  timestamp: string
+}
+
+interface PayloadWriteResponse {
+  rows?: PayloadWrite[]
+  total?: number
+  page?: number
+  limit?: number
+}
+
+const WRITES_PAGE_SIZE = 25
 
 const router = useRouter()
 const route = useRoute()
@@ -167,6 +247,12 @@ const { vessel, loading, error } = useVesselReader(id)
 
 const showBytes = ref(false)
 const copied = ref(false)
+const writesLoading = ref(false)
+const writesError = ref('')
+const writeRows = ref<PayloadWrite[]>([])
+const writeTotal = ref(0)
+const writesPage = ref(1)
+let writesRequestId = 0
 
 const activeEntry = ref(0)
 watch(() => vessel.value?.id, () => {
@@ -196,6 +282,17 @@ const contentType = computed(() => {
   return detectContent(activePayload.value).type
 })
 
+const writeTotalPages = computed(() => Math.max(1, Math.ceil(writeTotal.value / WRITES_PAGE_SIZE)))
+const writeCountLabel = computed(() => {
+  if (writesLoading.value && !writeRows.value.length) return 'loading'
+  if (writeTotal.value === 1) return '1 write'
+  return `${writeTotal.value} writes`
+})
+
+watch(id, () => {
+  void loadWrites(1)
+}, { immediate: true })
+
 // OG meta tags are injected server-side by server/plugins/og-meta.ts
 useHead(() => ({
   title: id.value ? `vessel #${id.value}` : 'vessel explorer',
@@ -209,6 +306,70 @@ async function copyBytes() {
   await navigator.clipboard.writeText('0x' + hex)
   copied.value = true
   setTimeout(() => { copied.value = false }, 2000)
+}
+
+async function loadWrites(page: number) {
+  const tokenId = id.value
+  if (!tokenId) {
+    writeRows.value = []
+    writeTotal.value = 0
+    writesPage.value = 1
+    writesError.value = ''
+    return
+  }
+
+  const requestId = ++writesRequestId
+  writesLoading.value = true
+  writesError.value = ''
+
+  try {
+    const data = await $fetch<PayloadWriteResponse>(`/api/tokens/${tokenId}/writes`, {
+      query: {
+        page,
+        limit: WRITES_PAGE_SIZE,
+        dir: 'desc',
+      },
+    })
+    if (requestId !== writesRequestId) return
+    writeRows.value = Array.isArray(data.rows) ? data.rows : []
+    writeTotal.value = Number(data.total) || 0
+    writesPage.value = Number(data.page) || page
+  } catch (err: any) {
+    if (requestId !== writesRequestId) return
+    writeRows.value = []
+    writeTotal.value = 0
+    writesPage.value = 1
+    writesError.value = err?.data?.message || err?.message || 'failed to load write history'
+  } finally {
+    if (requestId === writesRequestId) writesLoading.value = false
+  }
+}
+
+function formatBytes(bytes: number) {
+  return `${bytes} ${bytes === 1 ? 'byte' : 'bytes'}`
+}
+
+function formatWriteTime(timestamp: string) {
+  const date = new Date(Number(timestamp) * 1000)
+  if (Number.isNaN(date.getTime())) return 'unknown time'
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function compactHex(hex: string) {
+  const value = hex?.startsWith('0x') ? hex : `0x${hex || ''}`
+  if (value.length <= 98) return value
+  return `${value.slice(0, 66)}...${value.slice(-16)}`
+}
+
+function shortHash(hash: string) {
+  if (!hash) return ''
+  return `${hash.slice(0, 10)}...${hash.slice(-6)}`
 }
 </script>
 
@@ -323,6 +484,98 @@ async function copyBytes() {
   }
 }
 
+.section-header {
+  height: 2rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  box-sizing: border-box;
+}
+
+.section-count {
+  color: var(--text-faint);
+}
+
+.write-history {
+  margin-top: 1.5rem;
+  font-size: 13px;
+}
+
+.write-list {
+  border-inline: 1px solid var(--border-color);
+}
+
+.write-row {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.write-row-main,
+.write-row-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.write-row-main {
+  margin-bottom: 0.35rem;
+}
+
+.write-bytes {
+  color: var(--write);
+  font-weight: 700;
+}
+
+.write-entry,
+.write-time,
+.write-row-meta {
+  color: var(--muted);
+}
+
+.explorer-link {
+  color: var(--muted);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--color);
+  }
+}
+
+.write-hex {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.write-pagination {
+  min-height: 2rem;
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0 0.75rem;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.text-btn:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
 .vessel-in-enter-active {
   transition: opacity 0.35s ease, transform 0.35s ease;
 }
@@ -353,6 +606,20 @@ async function copyBytes() {
   .entry-btn {
     min-width: 4rem;
     font-size: 11px;
+  }
+
+  .section-header,
+  .write-pagination {
+    padding-inline: 0.5rem;
+  }
+
+  .write-row {
+    padding-inline: 0.5rem;
+  }
+
+  .write-row-main,
+  .write-row-meta {
+    gap: 0.4rem;
   }
 }
 </style>
