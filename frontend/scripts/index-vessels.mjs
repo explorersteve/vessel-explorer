@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -50,15 +51,15 @@ const tokenArg = process.argv.find(arg => arg.startsWith('--tokens='))
 const databaseUrl = process.env.DATABASE_URL
 const rpcUrl = process.env.ETH_RPC_URL
   || process.env.NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPC1
-  || 'https://eth.llamarpc.com'
+  || 'https://ethereum-rpc.publicnode.com'
 
 if (!databaseUrl) {
   console.error('DATABASE_URL is required')
   process.exit(1)
 }
 
-if (!args.has('--all') && !args.has('--missing') && !tokenArg) {
-  console.error('usage: pnpm db:backfill | pnpm db:sync | node scripts/index-vessels.mjs --tokens=1,2,3')
+if (!args.has('--all') && !args.has('--missing') && !args.has('--missing-payloads') && !tokenArg) {
+  console.error('usage: pnpm db:backfill | pnpm db:sync | pnpm db:payloads | node scripts/index-vessels.mjs --tokens=1,2,3')
   process.exit(1)
 }
 
@@ -114,6 +115,17 @@ async function resolveTokenIds() {
     return rows.map(row => row.id)
   }
 
+  if (args.has('--missing-payloads')) {
+    const rows = await sql`
+      select id
+      from tokens
+      where payload_bytes > 0
+        and octet_length(payload_data) = 0
+      order by id
+    `
+    return rows.map(row => row.id)
+  }
+
   return Array.from({ length: TOTAL_VESSELS }, (_, index) => index + 1)
 }
 
@@ -136,7 +148,8 @@ async function readTokenBatch(ids) {
     const owner = addressValue(resultAt(results, rowIndex, 0))
     const claimed = boolValue(resultAt(results, rowIndex, 1)) ?? Boolean(owner)
     const vesselType = stringValue(resultAt(results, rowIndex, 2))?.toLowerCase() ?? null
-    const payloadBytes = payloadByteLength(resultAt(results, rowIndex, 3))
+    const payloadData = payloadBuffer(resultAt(results, rowIndex, 3))
+    const payloadBytes = payloadData.length
 
     return {
       id,
@@ -145,6 +158,7 @@ async function readTokenBatch(ids) {
       vessel_type: vesselType,
       filled: payloadBytes > 0,
       payload_bytes: payloadBytes,
+      payload_data: payloadData,
       capacity_bytes: id,
       color_mode: numberValue(resultAt(results, rowIndex, 4)),
       role: numberValue(resultAt(results, rowIndex, 5)),
@@ -169,6 +183,7 @@ async function upsertTokenRows(rows) {
       'vessel_type',
       'filled',
       'payload_bytes',
+      'payload_data',
       'capacity_bytes',
       'color_mode',
       'role',
@@ -185,6 +200,7 @@ async function upsertTokenRows(rows) {
       vessel_type = excluded.vessel_type,
       filled = excluded.filled,
       payload_bytes = excluded.payload_bytes,
+      payload_data = excluded.payload_data,
       capacity_bytes = excluded.capacity_bytes,
       color_mode = excluded.color_mode,
       role = excluded.role,
@@ -222,8 +238,9 @@ function addressValue(value) {
   return value.toLowerCase() === ZERO_ADDRESS ? null : value.toLowerCase()
 }
 
-function payloadByteLength(value) {
-  if (typeof value !== 'string') return 0
+function payloadBuffer(value) {
+  if (typeof value !== 'string') return Buffer.alloc(0)
   const clean = value.startsWith('0x') ? value.slice(2) : value
-  return clean.length / 2
+  if (!clean || clean.length % 2 !== 0) return Buffer.alloc(0)
+  return Buffer.from(clean, 'hex')
 }

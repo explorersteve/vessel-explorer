@@ -6,6 +6,7 @@
     "db:schema": "node scripts/db-schema.mjs",
     "db:backfill": "node scripts/index-vessels.mjs --all",
     "db:sync": "node scripts/index-vessels.mjs --missing",
+    "db:payloads": "node scripts/index-vessels.mjs --missing-payloads",
     "dev": "nuxt dev",
     "build": "nuxt build",
     "generate": "nuxt generate",

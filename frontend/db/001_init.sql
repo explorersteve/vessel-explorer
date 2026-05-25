@@ -5,6 +5,7 @@ create table if not exists tokens (
   vessel_type text,
   filled boolean not null default false,
   payload_bytes integer not null default 0,
+  payload_data bytea not null default decode('', 'hex'),
   capacity_bytes integer not null,
   color_mode integer,
   role integer,
@@ -16,6 +17,9 @@ create table if not exists tokens (
   chosen_machine_address text,
   details_updated_at timestamptz not null default now()
 );
+
+alter table tokens
+  add column if not exists payload_data bytea not null default decode('', 'hex');
 
 create index if not exists tokens_owner_address_idx on tokens (owner_address);
 create index if not exists tokens_claimed_idx on tokens (claimed);
