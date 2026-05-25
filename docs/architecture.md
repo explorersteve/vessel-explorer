@@ -2,7 +2,7 @@
 
 ## Overview
 
-Read-only Nuxt SPA for exploring THE_VESSEL on-chain storage protocol. No wallet connect, no transactions. Runtime token data is served by a Ponder indexer backed by Postgres, with Etherscan/RPC fallbacks only for secondary chain reads.
+Read-only Nuxt SPA for exploring THE_VESSEL on-chain storage protocol. No wallet connect, no transactions. Runtime token data is served by a Ponder indexer backed by Postgres. The only browser RPC path is the live machine contract read for machine payload/name freshness.
 
 ## Contracts
 
@@ -70,9 +70,9 @@ Examples: vessel #2623 = 52x51, machine #5246 = 73x72.
 ## Pages
 
 ### `/` — Index
-- **Activity feed**: recent vessel interactions (claim, write, transfer, delegate, machine, role, entry). Decoded from etherscan API. Hover preview on vessel IDs.
-- **Holders tab**: leaderboard sorted by vessel count. Progressive type enrichment via `craftToType` RPC calls.
-- **Search**: vessel ID → detail page, address/ENS → profile page.
+- **Activity feed**: recent vessel interactions (claim, write, transfer, delegate, machine, role, entry) from the Ponder activity endpoint. Hover preview on vessel IDs.
+- **Holders tab**: leaderboard sorted by vessel count, including indexed machine/vault/capsule counts.
+- **Search**: vessel ID → detail page, address → profile page.
 - **[random]**: picks from vessels with known write activity.
 
 ### `/[id]` — Vessel Detail
@@ -84,9 +84,8 @@ Examples: vessel #2623 = 52x51, machine #5246 = 73x72.
 - Dynamic OG tags: title = vessel ID, description = type, image = server-generated BMP
 
 ### `/address/[addr]` — Profile
-- ENS resolution
 - Stats: total vessels, machines, vaults, capsules, empty
-- Vessel grid with progressive payload loading
+- Vessel grid from indexed owned and delegated token rows
 - Type-colored hover borders (machine=purple, vault=green, capsule=cyan)
 
 ## Data Flow
@@ -94,16 +93,18 @@ Examples: vessel #2623 = 52x51, machine #5246 = 73x72.
 ```
 Client                    Server Routes              External
 ──────                    ─────────────              ────────
-pages/*.vue          →    /api/activity.get.ts   →   Ponder /activity, Etherscan fallback
-composables/*.ts     →    /api/transfers.get.ts  →   Ponder /transfers, Etherscan fallback
-                     →    /api/tokens.get.ts     →   Ponder /tokens
-                     →    /api/og/[id].get.ts    →   Ethereum RPC (payload → BMP)
-readContract()       →    (direct)               →   Ethereum RPC
+pages/*.vue          →    /api/activity.get.ts   →   Ponder /activity
+composables/*.ts     →    /api/transfers.get.ts  →   Ponder /transfers
+                     →    /api/tokens*.ts        →   Ponder /tokens, /entries, /writes
+                     →    /api/holders.get.ts    →   Ponder /holders
+                     →    /api/stats.get.ts      →   Ponder /stats
+                     →    /api/og/[id].get.ts    →   Ponder /tokens/:id payload
+machine detail       →    (direct browser read)  →   Machine contract name()/craftToPayload()
 ```
 
-Etherscan API key is server-side only (`NUXT_ETHERSCAN_KEY`, no `PUBLIC` prefix). RPC calls go direct from client via wagmi/viem.
+`NUXT_INDEXER_URL` is required for Nuxt server routes. `NUXT_PUBLIC_MACHINE_RPC_URL` is optional and public; it is used only when viewing a machine vessel because machine contracts can change output without THE_VESSEL emitting a payload write event.
 
-When `NUXT_INDEXER_URL` is configured, Nuxt server routes use the Ponder API. The indexer tracks protocol state, all 10,000 tokens, payload writes, vault entries, transfers, approvals, holders, and activity from deployment block `24524524`. Event handlers use block-pinned contract reads so historical replay stores the state as it was at each event.
+The indexer tracks protocol state, all 10,000 tokens, payload writes, vault entries, transfers, approvals, holders, and activity from deployment block `24524524`. Event handlers use block-pinned contract reads so historical replay stores the state as it was at each event.
 
 ## Ponder Indexer
 
@@ -123,7 +124,6 @@ RPC behavior is configured with `PONDER_RPC_URLS_1`,
 
 - Nuxt SPA (`ssr: false`)
 - Ponder 0.16 indexer
-- @1001-digital/layers.evm (ENS resolution, dark/light mode, wagmi config)
-- viem for contract reads
-- Etherscan v2 API fallback (server-proxied, key not exposed to client)
+- @1001-digital/layers.base
+- viem for live machine contract reads
 - Terminal aesthetic: monospace, dark/light mode, minimal UI

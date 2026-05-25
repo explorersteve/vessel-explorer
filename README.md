@@ -1,14 +1,13 @@
 # Vessel Explorer
 
-A read-only explorer for [THE_VESSEL](https://evm.now/address/0xECb92Cc7112b80A2234936315BbB493fb48d1463), an on-chain storage protocol on Ethereum by [@stephensantoro_](https://x.com/stephensantoro_) and [@producedbydav](https://x.com/producedbydav). Browse vessels (capsules, vaults, and machines), view pixel-rendered payloads, inspect raw bytes, detect content types (SVG, HTML, bytecode), and explore holder leaderboards — all read directly from the blockchain.
+A read-only explorer for [THE_VESSEL](https://evm.now/address/0xECb92Cc7112b80A2234936315BbB493fb48d1463), an on-chain storage protocol on Ethereum by [@stephensantoro_](https://x.com/stephensantoro_) and [@producedbydav](https://x.com/producedbydav). Browse vessels (capsules, vaults, and machines), view pixel-rendered payloads, inspect raw bytes, detect content types (SVG, HTML, bytecode), and explore holder leaderboards from the Ponder indexer.
 
 ## Tech Stack
 
 - **[Nuxt 4](https://nuxt.com/)** — Vue framework (SPA mode)
 - **[Ponder](https://ponder.sh/)** — production indexer for token state, payload writes, transfers, holders, and activity
-- **[@1001-digital/layers.evm](https://www.npmjs.com/package/@1001-digital/layers.evm)** — ENS resolution, dark/light mode, wagmi/viem config
-- **[viem](https://viem.sh/)** — contract reads via public RPC
-- **[Etherscan API v2](https://docs.etherscan.io/)** — fallback transaction history and transfer data (server-side proxied)
+- **[@1001-digital/layers.base](https://www.npmjs.com/package/@1001-digital/layers.base)** — base UI layer, components, styles, and dark/light mode
+- **[viem](https://viem.sh/)** — live browser reads for machine contract payloads only
 
 Read-only. No wallet connect, no transactions.
 
@@ -28,9 +27,8 @@ pnpm dev
 
 Edit `.env` before starting the frontend if needed:
 
-- `NUXT_ETHERSCAN_KEY` enables Etherscan fallback activity and transfer routes.
 - `NUXT_INDEXER_URL` points the frontend server routes at the Ponder indexer.
-- `NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPC1/2/3` are the browser RPC fallbacks.
+- `NUXT_PUBLIC_MACHINE_RPC_URL` is the optional public browser RPC used only for live machine payload/name reads.
 
 ### Ponder Indexer
 
@@ -72,19 +70,20 @@ frontend/
       PixelRender.vue         # simple pixel render via data URL
       ContentView.vue         # content viewer (text, SVG, HTML with [run], bytecode hex dump)
       HexDump.vue             # raw hex dump
-      AddressDisplay.vue      # address with ENS resolution + EVM.NOW links
+      AddressDisplay.vue      # address links and shortening
     composables/
-      useVesselReader.ts      # reads vessel metadata, payload, entries from contract
-      useOwnership.ts         # transfer replay to compute current ownership
+      useVesselReader.ts      # reads vessel metadata, payload, entries from the indexer
+      useOwnership.ts         # indexer-backed current ownership
     utils/
-      vessel.ts               # ABI (30+ functions), grid math, pixel helpers
-      etherscan.ts            # etherscan API fetch + tx decoding
+      vessel.ts               # grid math, pixel helpers, formatting
+      activity.ts             # indexer-backed activity and transfer helpers
+      machine.ts              # live machine contract reads
       content.ts              # content type detection (SVG, HTML, text, bytecode, binary)
   server/api/
-    activity.get.ts           # Ponder activity API with Etherscan fallback
+    activity.get.ts           # Ponder activity API proxy
     tokens.get.ts             # Ponder token API proxy
-    transfers.get.ts          # Ponder transfer API with Etherscan fallback
-    og/[id].get.ts            # dynamic OG image: grayscale BMP from on-chain payload
+    transfers.get.ts          # Ponder transfer API proxy
+    og/[id].get.ts            # dynamic OG image from indexed payload
 indexer/
   ponder.config.ts            # mainnet chain, RPC load balancing, start/end override
   ponder.schema.ts            # protocol, token, entry, payload, transfer, activity tables
@@ -95,7 +94,7 @@ indexer/
 
 ## Pages
 
-- **`/`** — live activity feed (claims, writes, transfers, delegates, machines), holders leaderboard, search by vessel ID or address/ENS
+- **`/`** — activity feed (claims, writes, transfers, delegates, machines), holders leaderboard, search by vessel ID or address
 - **`/all`** — table of all vessel token IDs with Ponder-backed filtering/sorting
 - **`/[id]`** — vessel detail with pixel grid, metadata (type, capacity, color mode, claim block), entry navigation for vaults, content detection (renders SVG/HTML, shows bytecode hex dumps), [bytes] toggle, [copy] button
 - **`/address/[addr]`** — profile page with owned vessels grid, type stats (machines/vaults/capsules/empty), progressive payload loading
