@@ -124,32 +124,33 @@
 
             <div v-else class="history-list">
               <article v-for="event in machineRows" :key="event.hash" class="history-row machine-row">
-                <div class="history-row-main">
-                  <span class="history-kind machine-kind">machine</span>
-                  <a
-                    :href="`${EXPLORER_BASE}/address/${event.to}`"
-                    target="_blank"
-                    rel="noopener"
-                    class="machine-contract-link"
-                  >
-                    {{ shortenAddress(event.to) }}
-                  </a>
-                  <span class="history-time">{{ formatWriteTime(event.timeStamp) }}</span>
-                </div>
+                <div class="history-accent" aria-hidden="true" />
+                <div class="history-content">
+                  <div class="history-topline">
+                    <span class="history-kind machine-kind">set machine</span>
+                    <AddressDisplay :address="event.to" external />
+                    <span class="history-time">{{ formatWriteTime(event.timeStamp) }}</span>
+                  </div>
 
-                <div class="history-row-meta">
-                  <span v-if="event.from">
-                    setter <AddressDisplay :address="event.from" />
-                  </span>
-                  <a
-                    :href="`${EXPLORER_BASE}/tx/${event.hash}`"
-                    target="_blank"
-                    rel="noopener"
-                    class="explorer-link"
-                  >
-                    {{ shortHash(event.hash) }}
-                  </a>
-                  <span>block {{ event.blockNumber }}</span>
+                  <div class="history-meta-grid">
+                    <span v-if="event.from" class="history-meta-item">
+                      <span class="history-label">setter</span>
+                      <AddressDisplay :address="event.from" />
+                    </span>
+                    <a
+                      :href="`${EXPLORER_BASE}/tx/${event.hash}`"
+                      target="_blank"
+                      rel="noopener"
+                      class="history-meta-item explorer-link"
+                    >
+                      <span class="history-label">tx</span>
+                      {{ shortHash(event.hash) }}
+                    </a>
+                    <span class="history-meta-item">
+                      <span class="history-label">block</span>
+                      {{ event.blockNumber }}
+                    </span>
+                  </div>
                 </div>
               </article>
             </div>
@@ -162,44 +163,53 @@
 
             <div v-else class="history-list">
               <article v-for="write in writeRows" :key="write.id" class="history-row write-row">
-                <div class="history-row-main">
-                  <span class="history-kind write-kind">{{ formatBytes(write.payloadBytes) }}</span>
-                  <span v-if="vessel.isVault && write.entryIndex !== null" class="write-entry">
-                    entry {{ write.entryIndex }}
-                  </span>
-                  <span class="history-time">{{ formatWriteTime(write.timestamp) }}</span>
+                <div class="history-accent" aria-hidden="true" />
+                <div class="history-content">
+                  <div class="history-topline">
+                    <span class="history-kind write-kind">{{ formatBytes(write.payloadBytes) }}</span>
+                    <span v-if="vessel.isVault && write.entryIndex !== null" class="write-entry">
+                      entry {{ write.entryIndex }}
+                    </span>
+                    <span class="history-time">{{ formatWriteTime(write.timestamp) }}</span>
+                    <button
+                      type="button"
+                      class="copy-write-btn"
+                      @click="copyWriteBytes(write)"
+                    >
+                      {{ copiedWriteId === write.id ? '[copied]' : '[copy]' }}
+                    </button>
+                  </div>
+
+                  <div class="history-meta-grid">
+                    <span v-if="write.writer" class="history-meta-item">
+                      <span class="history-label">writer</span>
+                      <AddressDisplay :address="write.writer" />
+                    </span>
+                    <a
+                      :href="`${EXPLORER_BASE}/tx/${write.txHash}`"
+                      target="_blank"
+                      rel="noopener"
+                      class="history-meta-item explorer-link"
+                    >
+                      <span class="history-label">tx</span>
+                      {{ shortHash(write.txHash) }}
+                    </a>
+                    <span class="history-meta-item">
+                      <span class="history-label">block</span>
+                      {{ write.blockNumber }}
+                    </span>
+                  </div>
+
                   <button
                     type="button"
-                    class="copy-write-btn"
+                    class="write-hex"
+                    :title="write.payloadHex"
                     @click="copyWriteBytes(write)"
                   >
-                    {{ copiedWriteId === write.id ? '[copied]' : '[copy bytes]' }}
+                    <span class="write-hex-label">bytes</span>
+                    <code>{{ compactHex(write.payloadHex) }}</code>
                   </button>
                 </div>
-
-                <div class="history-row-meta">
-                  <span v-if="write.writer">
-                    writer <AddressDisplay :address="write.writer" />
-                  </span>
-                  <a
-                    :href="`${EXPLORER_BASE}/tx/${write.txHash}`"
-                    target="_blank"
-                    rel="noopener"
-                    class="explorer-link"
-                  >
-                    {{ shortHash(write.txHash) }}
-                  </a>
-                  <span>block {{ write.blockNumber }}</span>
-                </div>
-
-                <button
-                  type="button"
-                  class="write-hex"
-                  :title="write.payloadHex"
-                  @click="copyWriteBytes(write)"
-                >
-                  {{ compactHex(write.payloadHex) }}
-                </button>
               </article>
             </div>
 
@@ -232,7 +242,7 @@
 
 <script setup lang="ts">
 import { detectContent } from '~/utils/content'
-import { EXPLORER_BASE, colorModeName, shortenAddress } from '~/utils/vessel'
+import { EXPLORER_BASE, colorModeName } from '~/utils/vessel'
 import type { VesselTransaction } from '~/utils/activity'
 
 interface PayloadWrite {
@@ -638,44 +648,58 @@ function shortHash(hash: string) {
 }
 
 .history-list {
-  border-inline: 1px solid var(--border-color);
+  border: 1px solid var(--border-color);
+  border-top: 0;
 }
 
 .history-row {
-  padding: 0.75rem;
-  border-left: 2px solid transparent;
+  display: grid;
+  grid-template-columns: 0.25rem minmax(0, 1fr);
   border-bottom: 1px solid var(--border-color);
   background: var(--background);
   box-sizing: border-box;
+
+  &:last-child {
+    border-bottom: 0;
+  }
 
   &:hover {
     background: var(--bg-subtle);
   }
 }
 
-.write-row {
-  border-left-color: var(--write);
+.history-accent {
+  background: var(--muted);
 }
 
-.machine-row {
-  border-left-color: var(--color-machine);
+.write-row .history-accent {
+  background: var(--write);
 }
 
-.history-row-main,
-.history-row-meta {
-  display: flex;
+.machine-row .history-accent {
+  background: var(--color-machine);
+}
+
+.history-content {
+  min-width: 0;
+  padding: 0.7rem 0.75rem 0.75rem;
+}
+
+.history-topline {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: baseline;
-  flex-wrap: wrap;
   gap: 0.75rem;
+  min-width: 0;
 }
 
-.history-row-main {
-  margin-bottom: 0.35rem;
+.machine-row .history-topline {
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .history-kind {
-  min-width: 5.5rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .write-kind {
@@ -687,27 +711,56 @@ function shortHash(hash: string) {
 }
 
 .write-entry,
-.history-time,
-.history-row-meta {
+.history-time {
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .write-entry {
-  min-width: 4rem;
+  white-space: nowrap;
+}
+
+.history-meta-grid {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.history-meta-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
+  color: var(--muted);
+}
+
+.history-label {
+  color: var(--text-faint);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0;
 }
 
 .copy-write-btn {
-  padding: 0;
-  background: none;
-  border: none;
+  justify-self: end;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
   box-shadow: none;
   color: var(--text-faint);
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1;
   text-transform: uppercase;
 
   &:hover {
+    border-color: var(--muted);
     color: var(--color);
   }
 }
@@ -721,23 +774,15 @@ function shortHash(hash: string) {
   }
 }
 
-.machine-contract-link {
-  color: var(--color-machine);
-  font-weight: 700;
-  text-decoration: none;
-
-  &:hover {
-    color: var(--color);
-    text-decoration: underline;
-  }
-}
-
 .write-hex {
-  display: block;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.55rem;
   width: 100%;
   margin-top: 0.5rem;
-  padding: 0.45rem 0.5rem;
-  border: 1px solid transparent;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border-color);
   background: var(--bg-subtle);
   box-sizing: border-box;
   color: var(--text-faint);
@@ -746,14 +791,27 @@ function shortHash(hash: string) {
   font-size: 12px;
   line-height: 1.35;
   text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 
   &:hover {
-    border-color: var(--border-color);
+    border-color: var(--muted);
     color: var(--color);
   }
+
+  code {
+    min-width: 0;
+    overflow: hidden;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.write-hex-label {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
 }
 
 .write-pagination {
@@ -810,17 +868,35 @@ function shortHash(hash: string) {
     padding-inline: 0.5rem;
   }
 
-  .history-row {
+  .history-content {
     padding-inline: 0.5rem;
   }
 
-  .history-row-main,
-  .history-row-meta {
-    gap: 0.4rem;
+  .history-topline,
+  .machine-row .history-topline {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.35rem 0.5rem;
   }
 
-  .history-kind {
-    min-width: auto;
+  .history-kind,
+  .write-entry {
+    grid-column: 1;
+  }
+
+  .history-time,
+  .copy-write-btn {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .history-time {
+    grid-row: 1;
+    font-size: 12px;
+  }
+
+  .write-hex {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
   }
 }
 </style>
