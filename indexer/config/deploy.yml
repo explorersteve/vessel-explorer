@@ -60,7 +60,7 @@ accessories:
       secret:
         - POSTGRES_PASSWORD
     directories:
-      - /home/vessel-indexer-db/data:/var/lib/postgresql/data
+      - /home/deploy/vessel-indexer-db/data:/var/lib/postgresql/data
 
 ssh:
-  user: root
+  user: deploy
