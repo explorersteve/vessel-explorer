@@ -13,7 +13,10 @@ capsules and vault entries can still be inspected.
   claim state
 - Current ownership, delegates, roles, machine addresses, chosen machines,
   vault entry counts, chosen entries, lock state, and payload size
-- Current payload bytes for capsules, vaults, and machines as `payload_hex`
+- Current payload bytes for capsules and vaults as `payload_hex`
+- Machine addresses are indexed, but live machine contract payloads/names are
+  intentionally read by the frontend because they can change without
+  `THE_VESSEL` emitting an event
 - Every `PayloadSet` as `payload_writes`, including writer, payload bytes,
   block, log index, transaction hash, and timestamp
 - Vault/capsule entry snapshots in `vessel_entries`
@@ -95,6 +98,9 @@ Query params:
   `chosenEntry`, `delegate`, `machineAddress`, `chosenMachine`
 - `dir`: `asc` or `desc`
 - `search`: token ID or owner address
+- `ids`: comma-separated token IDs, up to the current page-size limit
+- `owner`: exact owner address
+- `delegate`: exact delegate address
 - `claim`: `all`, `claimed`, `unclaimed`
 - `filled`: `all`, `filled`, `empty`
 - `type`: `all`, `capsule`, `vault`, `machine`
@@ -115,8 +121,8 @@ Response shape:
 
 ### `GET /tokens/:id`
 
-Single token state, including current `payloadHex`, lock metadata, timestamps,
-and machine/vault flags.
+Single token state, including current `payloadHex`, machine address, lock
+metadata, timestamps, and machine/vault flags.
 
 ### `GET /tokens/:id/entries`
 
