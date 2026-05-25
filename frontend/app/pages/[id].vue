@@ -113,60 +113,116 @@
 
         <section class="write-history">
           <div class="section-header">
-            <span>write history</span>
-            <span class="section-count">{{ writeCountLabel }}</span>
+            <span>{{ historyTitle }}</span>
+            <span class="section-count">{{ historyCountLabel }}</span>
           </div>
 
-          <div v-if="writesLoading" class="status">loading writes...</div>
-          <div v-else-if="writesError" class="status status-error">{{ writesError }}</div>
-          <div v-else-if="!writeRows.length" class="status">no indexed writes</div>
+          <template v-if="vessel.isMachine">
+            <div v-if="machineEventsLoading" class="status">loading machine history...</div>
+            <div v-else-if="machineEventsError" class="status status-error">{{ machineEventsError }}</div>
+            <div v-else-if="!machineRows.length" class="status">no indexed machine changes</div>
 
-          <div v-else class="write-list">
-            <article v-for="write in writeRows" :key="write.id" class="write-row">
-              <div class="write-row-main">
-                <span class="write-bytes">{{ formatBytes(write.payloadBytes) }}</span>
-                <span v-if="write.entryIndex !== null" class="write-entry">entry {{ write.entryIndex }}</span>
-                <span class="write-time">{{ formatWriteTime(write.timestamp) }}</span>
-              </div>
+            <div v-else class="history-list">
+              <article v-for="event in machineRows" :key="event.hash" class="history-row machine-row">
+                <div class="history-row-main">
+                  <span class="history-kind machine-kind">machine</span>
+                  <a
+                    :href="`${EXPLORER_BASE}/address/${event.to}`"
+                    target="_blank"
+                    rel="noopener"
+                    class="machine-contract-link"
+                  >
+                    {{ shortenAddress(event.to) }}
+                  </a>
+                  <span class="history-time">{{ formatWriteTime(event.timeStamp) }}</span>
+                </div>
 
-              <div class="write-row-meta">
-                <span v-if="write.writer">
-                  writer <AddressDisplay :address="write.writer" />
-                </span>
-                <a
-                  :href="`${EXPLORER_BASE}/tx/${write.txHash}`"
-                  target="_blank"
-                  rel="noopener"
-                  class="explorer-link"
+                <div class="history-row-meta">
+                  <span v-if="event.from">
+                    setter <AddressDisplay :address="event.from" />
+                  </span>
+                  <a
+                    :href="`${EXPLORER_BASE}/tx/${event.hash}`"
+                    target="_blank"
+                    rel="noopener"
+                    class="explorer-link"
+                  >
+                    {{ shortHash(event.hash) }}
+                  </a>
+                  <span>block {{ event.blockNumber }}</span>
+                </div>
+              </article>
+            </div>
+          </template>
+
+          <template v-else>
+            <div v-if="writesLoading" class="status">loading writes...</div>
+            <div v-else-if="writesError" class="status status-error">{{ writesError }}</div>
+            <div v-else-if="!writeRows.length" class="status">no indexed writes</div>
+
+            <div v-else class="history-list">
+              <article v-for="write in writeRows" :key="write.id" class="history-row write-row">
+                <div class="history-row-main">
+                  <span class="history-kind write-kind">{{ formatBytes(write.payloadBytes) }}</span>
+                  <span v-if="vessel.isVault && write.entryIndex !== null" class="write-entry">
+                    entry {{ write.entryIndex }}
+                  </span>
+                  <span class="history-time">{{ formatWriteTime(write.timestamp) }}</span>
+                  <button
+                    type="button"
+                    class="copy-write-btn"
+                    @click="copyWriteBytes(write)"
+                  >
+                    {{ copiedWriteId === write.id ? '[copied]' : '[copy bytes]' }}
+                  </button>
+                </div>
+
+                <div class="history-row-meta">
+                  <span v-if="write.writer">
+                    writer <AddressDisplay :address="write.writer" />
+                  </span>
+                  <a
+                    :href="`${EXPLORER_BASE}/tx/${write.txHash}`"
+                    target="_blank"
+                    rel="noopener"
+                    class="explorer-link"
+                  >
+                    {{ shortHash(write.txHash) }}
+                  </a>
+                  <span>block {{ write.blockNumber }}</span>
+                </div>
+
+                <button
+                  type="button"
+                  class="write-hex"
+                  :title="write.payloadHex"
+                  @click="copyWriteBytes(write)"
                 >
-                  {{ shortHash(write.txHash) }}
-                </a>
-                <span>block {{ write.blockNumber }}</span>
-              </div>
+                  {{ compactHex(write.payloadHex) }}
+                </button>
+              </article>
+            </div>
 
-              <code class="write-hex">{{ compactHex(write.payloadHex) }}</code>
-            </article>
-          </div>
-
-          <div v-if="writeTotalPages > 1" class="write-pagination">
-            <button
-              type="button"
-              class="text-btn"
-              :disabled="writesPage <= 1 || writesLoading"
-              @click="loadWrites(writesPage - 1)"
-            >
-              [newer]
-            </button>
-            <span>{{ writesPage }} / {{ writeTotalPages }}</span>
-            <button
-              type="button"
-              class="text-btn"
-              :disabled="writesPage >= writeTotalPages || writesLoading"
-              @click="loadWrites(writesPage + 1)"
-            >
-              [older]
-            </button>
-          </div>
+            <div v-if="writeTotalPages > 1" class="write-pagination">
+              <button
+                type="button"
+                class="text-btn"
+                :disabled="writesPage <= 1 || writesLoading"
+                @click="loadWrites(writesPage - 1)"
+              >
+                [newer]
+              </button>
+              <span>{{ writesPage }} / {{ writeTotalPages }}</span>
+              <button
+                type="button"
+                class="text-btn"
+                :disabled="writesPage >= writeTotalPages || writesLoading"
+                @click="loadWrites(writesPage + 1)"
+              >
+                [older]
+              </button>
+            </div>
+          </template>
         </section>
       </div>
       </Transition>
@@ -176,7 +232,8 @@
 
 <script setup lang="ts">
 import { detectContent } from '~/utils/content'
-import { EXPLORER_BASE, colorModeName } from '~/utils/vessel'
+import { EXPLORER_BASE, colorModeName, shortenAddress } from '~/utils/vessel'
+import type { VesselTransaction } from '~/utils/activity'
 
 interface PayloadWrite {
   id: string
@@ -252,7 +309,12 @@ const writesError = ref('')
 const writeRows = ref<PayloadWrite[]>([])
 const writeTotal = ref(0)
 const writesPage = ref(1)
+const copiedWriteId = ref<string | null>(null)
 let writesRequestId = 0
+const machineEventsLoading = ref(false)
+const machineEventsError = ref('')
+const machineRows = ref<VesselTransaction[]>([])
+let machineEventsRequestId = 0
 
 const activeEntry = ref(0)
 watch(() => vessel.value?.id, () => {
@@ -288,9 +350,25 @@ const writeCountLabel = computed(() => {
   if (writeTotal.value === 1) return '1 write'
   return `${writeTotal.value} writes`
 })
+const machineCountLabel = computed(() => {
+  if (machineEventsLoading.value && !machineRows.value.length) return 'loading'
+  if (machineRows.value.length === 1) return '1 change'
+  return `${machineRows.value.length} changes`
+})
+const historyTitle = computed(() => vessel.value?.isMachine ? 'machine history' : 'write history')
+const historyCountLabel = computed(() => vessel.value?.isMachine ? machineCountLabel.value : writeCountLabel.value)
 
-watch(id, () => {
-  void loadWrites(1)
+watch(() => [id.value, vessel.value?.isMachine] as const, ([tokenId, isMachine]) => {
+  if (!tokenId || isMachine === undefined) {
+    clearHistory()
+    return
+  }
+
+  if (isMachine) {
+    void loadMachineEvents()
+  } else {
+    void loadWrites(1)
+  }
 }, { immediate: true })
 
 // OG meta tags are injected server-side by server/plugins/og-meta.ts
@@ -308,6 +386,23 @@ async function copyBytes() {
   setTimeout(() => { copied.value = false }, 2000)
 }
 
+async function copyWriteBytes(write: PayloadWrite) {
+  await navigator.clipboard.writeText(write.payloadHex)
+  copiedWriteId.value = write.id
+  setTimeout(() => {
+    if (copiedWriteId.value === write.id) copiedWriteId.value = null
+  }, 2000)
+}
+
+function clearHistory() {
+  writeRows.value = []
+  writeTotal.value = 0
+  writesPage.value = 1
+  writesError.value = ''
+  machineRows.value = []
+  machineEventsError.value = ''
+}
+
 async function loadWrites(page: number) {
   const tokenId = id.value
   if (!tokenId) {
@@ -319,6 +414,8 @@ async function loadWrites(page: number) {
   }
 
   const requestId = ++writesRequestId
+  machineRows.value = []
+  machineEventsError.value = ''
   writesLoading.value = true
   writesError.value = ''
 
@@ -342,6 +439,39 @@ async function loadWrites(page: number) {
     writesError.value = err?.data?.message || err?.message || 'failed to load write history'
   } finally {
     if (requestId === writesRequestId) writesLoading.value = false
+  }
+}
+
+async function loadMachineEvents() {
+  const tokenId = id.value
+  if (!tokenId) {
+    clearHistory()
+    return
+  }
+
+  const requestId = ++machineEventsRequestId
+  writeRows.value = []
+  writeTotal.value = 0
+  writesError.value = ''
+  machineEventsLoading.value = true
+  machineEventsError.value = ''
+
+  try {
+    const rows = await $fetch<VesselTransaction[]>('/api/activity', {
+      query: {
+        tokenId,
+        type: 'machine',
+        limit: 50,
+      },
+    })
+    if (requestId !== machineEventsRequestId) return
+    machineRows.value = Array.isArray(rows) ? rows : []
+  } catch (err: any) {
+    if (requestId !== machineEventsRequestId) return
+    machineRows.value = []
+    machineEventsError.value = err?.data?.message || err?.message || 'failed to load machine history'
+  } finally {
+    if (requestId === machineEventsRequestId) machineEventsLoading.value = false
   }
 }
 
@@ -507,36 +637,79 @@ function shortHash(hash: string) {
   font-size: 13px;
 }
 
-.write-list {
+.history-list {
   border-inline: 1px solid var(--border-color);
 }
 
-.write-row {
+.history-row {
   padding: 0.75rem;
+  border-left: 2px solid transparent;
   border-bottom: 1px solid var(--border-color);
+  background: var(--background);
+  box-sizing: border-box;
+
+  &:hover {
+    background: var(--bg-subtle);
+  }
 }
 
-.write-row-main,
-.write-row-meta {
+.write-row {
+  border-left-color: var(--write);
+}
+
+.machine-row {
+  border-left-color: var(--color-machine);
+}
+
+.history-row-main,
+.history-row-meta {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 0.75rem;
 }
 
-.write-row-main {
+.history-row-main {
   margin-bottom: 0.35rem;
 }
 
-.write-bytes {
-  color: var(--write);
+.history-kind {
+  min-width: 5.5rem;
   font-weight: 700;
 }
 
+.write-kind {
+  color: var(--write);
+}
+
+.machine-kind {
+  color: var(--color-machine);
+}
+
 .write-entry,
-.write-time,
-.write-row-meta {
+.history-time,
+.history-row-meta {
   color: var(--muted);
+}
+
+.write-entry {
+  min-width: 4rem;
+}
+
+.copy-write-btn {
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+
+  &:hover {
+    color: var(--color);
+  }
 }
 
 .explorer-link {
@@ -548,15 +721,39 @@ function shortHash(hash: string) {
   }
 }
 
+.machine-contract-link {
+  color: var(--color-machine);
+  font-weight: 700;
+  text-decoration: none;
+
+  &:hover {
+    color: var(--color);
+    text-decoration: underline;
+  }
+}
+
 .write-hex {
   display: block;
+  width: 100%;
   margin-top: 0.5rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid transparent;
+  background: var(--bg-subtle);
+  box-sizing: border-box;
   color: var(--text-faint);
+  cursor: copy;
   font-family: var(--font-mono);
   font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+
+  &:hover {
+    border-color: var(--border-color);
+    color: var(--color);
+  }
 }
 
 .write-pagination {
@@ -613,13 +810,17 @@ function shortHash(hash: string) {
     padding-inline: 0.5rem;
   }
 
-  .write-row {
+  .history-row {
     padding-inline: 0.5rem;
   }
 
-  .write-row-main,
-  .write-row-meta {
+  .history-row-main,
+  .history-row-meta {
     gap: 0.4rem;
+  }
+
+  .history-kind {
+    min-width: auto;
   }
 }
 </style>
