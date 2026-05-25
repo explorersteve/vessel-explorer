@@ -1,3 +1,11 @@
+<%
+indexer_hosts = [ENV["INDEXER_HOST"]]
+  .concat((ENV["INDEXER_ADDITIONAL_HOSTS"] || "").split(","))
+  .map(&:strip)
+  .reject(&:empty?)
+  .uniq
+%>
+
 service: vessel-indexer
 
 image: <%= ENV["DOCKER_REGISTRY_USERNAME"] %>/vessel-indexer
@@ -12,7 +20,9 @@ servers:
 proxy:
   ssl: true
   hosts:
-    - <%= ENV["INDEXER_HOST"] %>
+<% indexer_hosts.each do |host| %>
+    - <%= host %>
+<% end %>
   app_port: 42069
   healthcheck:
     path: /health

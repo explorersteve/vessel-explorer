@@ -250,6 +250,8 @@ Required in production:
 
 Optional:
 
+- `INDEXER_ADDITIONAL_HOSTS` comma-separated proxy aliases, for example
+  `indexer.thevessel.fun`
 - `DATABASE_SCHEMA`
 - `PONDER_RPC_FALLBACK_URLS_1`
 - `PONDER_WS_URL_1`
@@ -273,6 +275,7 @@ For production, replace the host with:
 
 ```txt
 https://indexer.vessel.worldcomputer.art
+https://indexer.thevessel.fun
 ```
 
 ## Operational Notes
