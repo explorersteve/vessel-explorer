@@ -145,6 +145,34 @@ app.get('/tokens/:id{[0-9]+}', async (c) => {
   })
 })
 
+app.get('/grid', async (c) => {
+  const result = await db.execute(sql`
+    SELECT
+      token_id::integer AS id,
+      vessel_type AS type,
+      payload_hex AS "payloadHex",
+      payload_bytes AS "payloadBytes",
+      color_mode AS "colorMode"
+    FROM ${token}
+    WHERE claimed = true
+    ORDER BY token_id ASC
+  `)
+
+  const rows = normalizeRows(result).map((row) => ({
+    id: Number(row.id),
+    type: row.type ?? null,
+    payloadHex: row.payloadHex,
+    payloadBytes: Number(row.payloadBytes ?? 0),
+    colorMode: row.colorMode == null ? null : Number(row.colorMode),
+  }))
+
+  return c.json({
+    rows,
+    total: rows.length,
+    source: 'ponder',
+  })
+})
+
 app.get('/tokens/:id{[0-9]+}/entries', async (c) => {
   const id = BigInt(c.req.param('id'))
   const result = await db.execute(sql`
