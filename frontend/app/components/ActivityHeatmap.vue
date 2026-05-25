@@ -86,6 +86,7 @@ const rangeLabel = computed(() => {
 const monthLabels = computed(() => {
   const labels: Array<{ key: string; label: string; column: string }> = []
   const seen = new Set<string>()
+  let lastColumn = -Infinity
 
   for (let index = 0; index < days.value.length; index++) {
     const day = days.value[index]!
@@ -94,11 +95,18 @@ const monthLabels = computed(() => {
     if (seen.has(key)) continue
     if (index !== 0 && date !== 1) continue
 
+    const column = Math.floor((leadingBlanks.value + index) / 7) + 1
+    if (column - lastColumn < 3) {
+      seen.add(key)
+      continue
+    }
+
     seen.add(key)
+    lastColumn = column
     labels.push({
       key,
       label: formatMonth(day.date),
-      column: String(Math.floor((leadingBlanks.value + index) / 7) + 1),
+      column: String(column),
     })
   }
 
