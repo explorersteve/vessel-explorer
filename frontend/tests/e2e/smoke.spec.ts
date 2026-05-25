@@ -60,6 +60,26 @@ test('heatmap renders useful contrast without the old date range caption', async
   await expect(page.locator('.heatmap-tooltip-count')).toContainText(/interaction/)
 })
 
+test('mobile heatmap opens day details on tap', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({
+    baseURL,
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  })
+  const page = await context.newPage()
+
+  await page.goto('/')
+  await page.getByText('heatmap', { exact: true }).click()
+  await expect(page.locator('.heatmap-day').first()).toBeVisible()
+
+  await page.locator('.heatmap-day').first().tap()
+  await expect(page.locator('.heatmap-tooltip')).toBeVisible()
+  await expect(page.locator('.heatmap-tooltip-count')).toContainText(/interaction/)
+
+  await context.close()
+})
+
 test('vessel write rows keep click-to-copy and aligned dates', async ({ page }) => {
   for (const path of ['/3600', '/2623']) {
     await page.goto(path)

@@ -39,28 +39,14 @@
               class="heatmap-empty"
               aria-hidden="true"
             />
-            <Tooltip
+            <ActivityHeatmapDay
               v-for="(day, index) in days"
               :key="day.date"
-              side="top"
-              align="center"
-              :side-offset="8"
-              :delay-duration="80"
-              :arrow="false"
-            >
-              <template #trigger>
-                <span
-                  :class="['heatmap-day', `level-${levelFor(day.count)}`, { deployment: index === 0 }]"
-                  :aria-label="dayTitle(day, index)"
-                  tabindex="0"
-                />
-              </template>
-              <div class="heatmap-tooltip">
-                <span class="heatmap-tooltip-date">{{ formatDate(day.date) }}</span>
-                <span class="heatmap-tooltip-count">{{ interactionLabel(day.count) }}</span>
-                <span v-if="index === 0" class="heatmap-tooltip-note">contract deployed</span>
-              </div>
-            </Tooltip>
+              :day="day"
+              :level="levelFor(day.count)"
+              :deployment="index === 0"
+              :click-mode="clickMode"
+            />
           </div>
         </div>
       </div>
@@ -69,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import type { DailyActivityDay, DailyActivityResponse } from '~/utils/activity'
+import type { DailyActivityResponse } from '~/utils/activity'
 
 const props = defineProps<{
   data: DailyActivityResponse | null
@@ -83,6 +69,12 @@ const weekdayLabels = ['', 'Mon', '', 'Wed', '', 'Fri', '']
 const days = computed(() => props.data?.days ?? [])
 const leadingBlanks = computed(() => days.value.length ? utcWeekday(days.value[0]!.date) : 0)
 const weekCount = computed(() => Math.max(1, Math.ceil((leadingBlanks.value + days.value.length) / 7)))
+const clickMode = ref(false)
+let clickModeMedia: MediaQueryList | null = null
+
+function updateClickMode() {
+  clickMode.value = clickModeMedia?.matches ?? false
+}
 
 const totalLabel = computed(() => {
   const total = props.data?.total ?? 0
@@ -139,17 +131,6 @@ function levelFor(count: number) {
   return level === -1 ? HEATMAP_LEVELS : level + 1
 }
 
-function dayTitle(day: DailyActivityDay, index: number) {
-  const count = interactionLabel(day.count)
-  return index === 0
-    ? `${formatDate(day.date)}: contract deployed, ${count}`
-    : `${formatDate(day.date)}: ${count}`
-}
-
-function interactionLabel(count: number) {
-  return `${count.toLocaleString()} ${count === 1 ? 'interaction' : 'interactions'}`
-}
-
 function utcWeekday(dateKey: string) {
   return new Date(`${dateKey}T00:00:00.000Z`).getUTCDay()
 }
@@ -161,14 +142,16 @@ function formatMonth(dateKey: string) {
   })
 }
 
-function formatDate(dateKey: string) {
-  return new Date(`${dateKey}T00:00:00.000Z`).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  })
-}
+onMounted(() => {
+  clickModeMedia = window.matchMedia('(hover: none), (pointer: coarse)')
+  updateClickMode()
+  clickModeMedia.addEventListener('change', updateClickMode)
+})
+
+onBeforeUnmount(() => {
+  clickModeMedia?.removeEventListener('change', updateClickMode)
+  clickModeMedia = null
+})
 </script>
 
 <style scoped>
@@ -237,78 +220,10 @@ function formatDate(dateKey: string) {
 }
 
 .heatmap-empty,
-.heatmap-day {
+.heatmap-grid :deep(.heatmap-day) {
   inline-size: var(--heatmap-cell);
   block-size: var(--heatmap-cell);
   box-sizing: border-box;
-}
-
-.heatmap-day {
-  border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent);
-  background: var(--bg-muted);
-}
-
-.heatmap-day.level-1 {
-  background: color-mix(in srgb, var(--color-vault) 12%, var(--background));
-}
-
-.heatmap-day.level-2 {
-  background: color-mix(in srgb, var(--color-vault) 20%, var(--background));
-}
-
-.heatmap-day.level-3 {
-  background: color-mix(in srgb, var(--color-vault) 30%, var(--background));
-}
-
-.heatmap-day.level-4 {
-  background: color-mix(in srgb, var(--color-vault) 42%, var(--background));
-}
-
-.heatmap-day.level-5 {
-  background: color-mix(in srgb, var(--color-vault) 55%, var(--background));
-}
-
-.heatmap-day.level-6 {
-  background: color-mix(in srgb, var(--color-vault) 68%, var(--background));
-}
-
-.heatmap-day.level-7 {
-  background: color-mix(in srgb, var(--color-vault) 82%, var(--background));
-}
-
-.heatmap-day.level-8 {
-  background: var(--color-vault);
-}
-
-.heatmap-day.deployment {
-  border-color: var(--color);
-}
-
-.heatmap-day:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.heatmap-tooltip {
-  display: grid;
-  gap: 0.18rem;
-  min-inline-size: 8.5rem;
-  font-size: 11px;
-  line-height: 1.25;
-}
-
-.heatmap-tooltip-date {
-  color: var(--color);
-  font-weight: 600;
-}
-
-.heatmap-tooltip-count {
-  color: var(--muted);
-}
-
-.heatmap-tooltip-note {
-  color: var(--text-faint);
-  font-size: 10px;
 }
 
 @media (max-width: 640px) {
