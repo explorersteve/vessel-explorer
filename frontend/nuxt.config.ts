@@ -2,7 +2,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   extends: ['@1001-digital/layers.evm'],
   ssr: false,
-  devtools: { enabled: true },
+  devtools: { enabled: process.env.NODE_ENV !== 'production' },
   devServer: {
     host: '127.0.0.1',
     port: 3001,

@@ -6,7 +6,10 @@
     "dev": "nuxt dev",
     "build": "nuxt build",
     "generate": "nuxt generate",
-    "preview": "nuxt preview"
+    "preview": "nuxt preview",
+    "typecheck": "nuxi typecheck",
+    "test:e2e": "NITRO_PRESET=node-server pnpm build && playwright test",
+    "test:e2e:live": "PLAYWRIGHT_BASE_URL=https://vessel.worldcomputer.art playwright test"
   },
   "dependencies": {
     "@1001-digital/components.evm": "^3.6.0",
@@ -17,5 +20,8 @@
     "nuxt": "^4.3.1",
     "postcss-nesting": "^14.0.0",
     "viem": "^2.48.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
   }
 }
