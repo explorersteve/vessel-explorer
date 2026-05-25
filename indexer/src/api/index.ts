@@ -82,7 +82,9 @@ app.get('/tokens', async (c) => {
         chosen_entry AS "chosenEntry",
         delegate,
         machine AS "machineAddress",
-        chosen_machine AS "chosenMachine"
+        chosen_machine AS "chosenMachine",
+        is_vault AS "isVault",
+        is_machine AS "isMachine"
         ${payloadSelect}
       FROM ${token}
       WHERE ${whereClause}
@@ -127,6 +129,8 @@ app.get('/tokens/:id{[0-9]+}', async (c) => {
       delegate: row.delegate,
       machineAddress: row.machine,
       chosenMachine: row.chosen_machine,
+      isVault: row.is_vault,
+      isMachine: row.is_machine,
       payloadHex: row.payload_hex,
     }),
     locked: row.locked,
@@ -287,7 +291,7 @@ app.get('/transfers', async (c) => {
 })
 
 app.get('/holders', async (c) => {
-  const limit = Math.min(500, Math.max(1, Number(c.req.query('limit')) || 100))
+  const limit = Math.min(5_000, Math.max(1, Number(c.req.query('limit')) || 100))
   const result = await db.execute(sql`
     SELECT
       owner AS address,
@@ -316,7 +320,10 @@ app.get('/stats', async (c) => {
         COUNT(*) FILTER (WHERE filled = true)::integer AS filled,
         COUNT(*) FILTER (WHERE vessel_type = 'machine')::integer AS machines,
         COUNT(*) FILTER (WHERE vessel_type = 'vault')::integer AS vaults,
-        COUNT(*) FILTER (WHERE vessel_type = 'capsule')::integer AS capsules
+        COUNT(*) FILTER (WHERE vessel_type = 'capsule')::integer AS capsules,
+        COALESCE(SUM(capacity_bytes) FILTER (WHERE claimed = true), 0)::integer AS "claimedCapacityBytes",
+        COALESCE(SUM(payload_bytes), 0)::integer AS "filledBytes",
+        COUNT(DISTINCT owner) FILTER (WHERE claimed = true AND owner IS NOT NULL)::integer AS "uniqueHolders"
       FROM ${token}
     `),
     db.execute(sql`
@@ -352,7 +359,13 @@ function normalizeRows(result: unknown): Row[] {
 function tokenFilters(c: { req: { query: (key: string) => string | undefined } }) {
   const conds = [sql`true`]
   const search = (c.req.query('search') || '').trim().toLowerCase()
+  const ids = parseTokenIds(c.req.query('ids') || '')
+  const owner = (c.req.query('owner') || '').trim()
+  const delegate = (c.req.query('delegate') || '').trim()
 
+  if (ids.length) {
+    conds.push(orClause(ids.map((id) => sql`token_id = ${id}`)))
+  }
   if (search) {
     if (/^\d+$/.test(search)) {
       conds.push(sql`token_id = ${BigInt(search)}`)
@@ -361,6 +374,12 @@ function tokenFilters(c: { req: { query: (key: string) => string | undefined } }
     } else {
       conds.push(sql`false`)
     }
+  }
+  if (ADDRESS_PATTERN.test(owner)) {
+    conds.push(sql`lower(owner) = lower(${owner})`)
+  }
+  if (ADDRESS_PATTERN.test(delegate)) {
+    conds.push(sql`lower(delegate) = lower(${delegate})`)
   }
 
   const claim = c.req.query('claim') || 'all'
@@ -382,6 +401,23 @@ function tokenFilters(c: { req: { query: (key: string) => string | undefined } }
   }
 
   return conds
+}
+
+function parseTokenIds(value: string) {
+  const ids: bigint[] = []
+  const seen = new Set<string>()
+  for (const part of value.split(',')) {
+    const trimmed = part.trim()
+    if (!/^\d+$/.test(trimmed)) continue
+    const id = BigInt(trimmed)
+    if (id < 1n || id > 10_000n) continue
+    const key = id.toString()
+    if (seen.has(key)) continue
+    seen.add(key)
+    ids.push(id)
+    if (ids.length >= MAX_PAGE_SIZE) break
+  }
+  return ids
 }
 
 function activityFilters(c: { req: { query: (key: string) => string | undefined } }) {
@@ -414,6 +450,14 @@ function andClause(conds: ReturnType<typeof sql>[]) {
   )
 }
 
+function orClause(conds: ReturnType<typeof sql>[]) {
+  if (conds.length === 0) return sql`false`
+  const clause = conds.reduce((acc, cond, index) =>
+    index === 0 ? cond : sql`${acc} OR ${cond}`,
+  )
+  return sql`(${clause})`
+}
+
 function normalizeTokenRow(row: Row) {
   return {
     id: Number(row.id),
@@ -431,6 +475,8 @@ function normalizeTokenRow(row: Row) {
     delegate: row.delegate ?? null,
     machineAddress: row.machineAddress ?? null,
     chosenMachine: row.chosenMachine ?? null,
+    isVault: Boolean(row.isVault),
+    isMachine: Boolean(row.isMachine),
     ...(row.payloadHex == null ? {} : { payloadHex: row.payloadHex }),
   }
 }
