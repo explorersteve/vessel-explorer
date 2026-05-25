@@ -18,9 +18,44 @@ const MACHINE_ABI = [
   },
 ] as const
 
+let clientRpcUrl = ''
+let client: ReturnType<typeof createPublicClient> | null = null
+const machineNameRequests = new Map<string, Promise<string | null>>()
+
 function machineRpcUrl() {
   const config = useRuntimeConfig()
   return String(config.public.machineRpcUrl || 'https://ethereum-rpc.publicnode.com')
+}
+
+function getMachineClient() {
+  const rpcUrl = machineRpcUrl()
+  if (!client || clientRpcUrl !== rpcUrl) {
+    clientRpcUrl = rpcUrl
+    client = createPublicClient({
+      chain: mainnet,
+      transport: http(rpcUrl),
+    })
+  }
+  return client
+}
+
+export async function fetchMachineName(machineAddress: Hex) {
+  if (!import.meta.client) return null
+
+  const cacheKey = machineAddress.toLowerCase()
+  const cached = machineNameRequests.get(cacheKey)
+  if (cached) return cached
+
+  const request = getMachineClient().readContract({
+    address: machineAddress,
+    abi: MACHINE_ABI,
+    functionName: 'name',
+  })
+    .then((name) => typeof name === 'string' && name.length > 0 ? name : null)
+    .catch(() => null)
+
+  machineNameRequests.set(cacheKey, request)
+  return request
 }
 
 export async function fetchLiveMachineState(machineAddress: Hex, tokenId: number) {
@@ -31,18 +66,9 @@ export async function fetchLiveMachineState(machineAddress: Hex, tokenId: number
     }
   }
 
-  const client = createPublicClient({
-    chain: mainnet,
-    transport: http(machineRpcUrl()),
-  })
-
   const [name, payloadHex] = await Promise.all([
-    client.readContract({
-      address: machineAddress,
-      abi: MACHINE_ABI,
-      functionName: 'name',
-    }).catch(() => null),
-    client.readContract({
+    fetchMachineName(machineAddress),
+    getMachineClient().readContract({
       address: machineAddress,
       abi: MACHINE_ABI,
       functionName: 'craftToPayload',
@@ -51,7 +77,7 @@ export async function fetchLiveMachineState(machineAddress: Hex, tokenId: number
   ])
 
   return {
-    name: typeof name === 'string' && name.length > 0 ? name : null,
+    name,
     payloadHex: typeof payloadHex === 'string' ? payloadHex : null,
   }
 }

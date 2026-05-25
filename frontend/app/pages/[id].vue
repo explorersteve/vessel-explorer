@@ -128,7 +128,15 @@
                 <div class="history-content">
                   <div class="history-topline">
                     <span class="history-kind machine-kind">set machine</span>
-                    <AddressDisplay :address="event.to" external />
+                    <a
+                      :href="`${EXPLORER_BASE}/address/${event.to}`"
+                      target="_blank"
+                      rel="noopener"
+                      class="machine-contract-name"
+                      :title="event.to"
+                    >
+                      {{ machineHistoryName(event.to) }}
+                    </a>
                     <span class="history-time">{{ formatWriteTime(event.timeStamp) }}</span>
                   </div>
 
@@ -242,7 +250,8 @@
 
 <script setup lang="ts">
 import { detectContent } from '~/utils/content'
-import { EXPLORER_BASE, colorModeName } from '~/utils/vessel'
+import { fetchMachineName } from '~/utils/machine'
+import { EXPLORER_BASE, colorModeName, shortenAddress } from '~/utils/vessel'
 import type { VesselTransaction } from '~/utils/activity'
 
 interface PayloadWrite {
@@ -324,6 +333,7 @@ let writesRequestId = 0
 const machineEventsLoading = ref(false)
 const machineEventsError = ref('')
 const machineRows = ref<VesselTransaction[]>([])
+const machineNames = ref<Record<string, string | null>>({})
 let machineEventsRequestId = 0
 
 const activeEntry = ref(0)
@@ -367,6 +377,14 @@ const machineCountLabel = computed(() => {
 })
 const historyTitle = computed(() => vessel.value?.isMachine ? 'machine history' : 'write history')
 const historyCountLabel = computed(() => vessel.value?.isMachine ? machineCountLabel.value : writeCountLabel.value)
+
+watch(() => [vessel.value?.machineAddress, vessel.value?.machineName] as const, ([address, name]) => {
+  if (!address || !name) return
+  machineNames.value = {
+    ...machineNames.value,
+    [machineAddressKey(address)]: name,
+  }
+})
 
 watch(() => [id.value, vessel.value?.isMachine] as const, ([tokenId, isMachine]) => {
   if (!tokenId || isMachine === undefined) {
@@ -476,6 +494,7 @@ async function loadMachineEvents() {
     })
     if (requestId !== machineEventsRequestId) return
     machineRows.value = Array.isArray(rows) ? rows : []
+    void loadMachineNames(machineRows.value)
   } catch (err: any) {
     if (requestId !== machineEventsRequestId) return
     machineRows.value = []
@@ -483,6 +502,28 @@ async function loadMachineEvents() {
   } finally {
     if (requestId === machineEventsRequestId) machineEventsLoading.value = false
   }
+}
+
+function machineAddressKey(address: string) {
+  return address.toLowerCase()
+}
+
+function machineHistoryName(address: string) {
+  return machineNames.value[machineAddressKey(address)] || shortenAddress(address)
+}
+
+async function loadMachineNames(rows: VesselTransaction[]) {
+  const addresses = [...new Set(rows.map((row) => row.to).filter(Boolean))]
+  await Promise.all(addresses.map(async (address) => {
+    const key = machineAddressKey(address)
+    if (Object.prototype.hasOwnProperty.call(machineNames.value, key)) return
+
+    const name = await fetchMachineName(address as `0x${string}`)
+    machineNames.value = {
+      ...machineNames.value,
+      [key]: name,
+    }
+  }))
 }
 
 function formatBytes(bytes: number) {
@@ -774,6 +815,20 @@ function shortHash(hash: string) {
   }
 }
 
+.machine-contract-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color);
+  font-weight: 700;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .write-hex {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -892,6 +947,10 @@ function shortHash(hash: string) {
   .history-time {
     grid-row: 1;
     font-size: 12px;
+  }
+
+  .machine-contract-name {
+    grid-column: 1 / -1;
   }
 
   .write-hex {
