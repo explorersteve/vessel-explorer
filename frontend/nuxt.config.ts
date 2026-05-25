@@ -1,6 +1,6 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
-  extends: ['@1001-digital/layers.evm'],
+  extends: ['@1001-digital/layers.base'],
   ssr: false,
   devtools: { enabled: true },
   devServer: {
@@ -35,16 +35,9 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    // Server-only (not shipped to browser)
-    etherscanKey: '',
     indexerUrl: '',
     public: {
-      evm: {
-
-        chains: {
-          mainnet: { rpc1: '', rpc2: '', rpc3: '' },
-        },
-      },
+      machineRpcUrl: '',
     },
   },
 })
