@@ -1,29 +1,4 @@
-import { createPublicClient, http } from 'viem'
-import { mainnet } from 'viem/chains'
 import { deflateSync } from 'node:zlib'
-
-const VESSEL_ADDRESS = '0xECb92Cc7112b80A2234936315BbB493fb48d1463' as const
-
-const client = createPublicClient({
-  chain: mainnet,
-  transport: http('https://ethereum-rpc.publicnode.com'),
-})
-
-const craftToPayloadAbi = [{
-  name: 'craftToPayload',
-  type: 'function',
-  stateMutability: 'view',
-  inputs: [{ name: 'tokenId', type: 'uint256' }],
-  outputs: [{ name: '', type: 'bytes' }],
-}] as const
-
-const craftToColorModeAbi = [{
-  name: 'craftToColorMode',
-  type: 'function',
-  stateMutability: 'view',
-  inputs: [{ name: 'tokenId', type: 'uint256' }],
-  outputs: [{ name: '', type: 'uint8' }],
-}] as const
 
 function getGridDimensions(tokenId: number) {
   const cols = Math.ceil(Math.sqrt(tokenId))
@@ -65,6 +40,16 @@ function byteToRGB(v: number, mode: number): [number, number, number] {
     case 3: return [0, 0, v]
     default: return [v, v, v]
   }
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const clean = hex.startsWith('0x') ? hex.slice(2) : hex
+  if (!clean || clean.length % 2 !== 0) return new Uint8Array(0)
+  const bytes = new Uint8Array(clean.length / 2)
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(clean.substring(i * 2, i * 2 + 2), 16)
+  }
+  return bytes
 }
 
 function buildPng(pixels: Uint8Array, width: number, height: number, scale: number, colorMode: number = 0): Buffer {
@@ -127,28 +112,9 @@ export default defineEventHandler(async (event) => {
   const scale = Math.max(1, Math.floor(400 / cols))
 
   try {
-    const [rawPayload, rawColorMode] = await Promise.all([
-      client.readContract({
-        address: VESSEL_ADDRESS,
-        abi: craftToPayloadAbi,
-        functionName: 'craftToPayload',
-        args: [BigInt(tokenId)],
-      }),
-      client.readContract({
-        address: VESSEL_ADDRESS,
-        abi: craftToColorModeAbi,
-        functionName: 'craftToColorMode',
-        args: [BigInt(tokenId)],
-      }).catch(() => 0),
-    ])
-
-    const payload = rawPayload as string
-    const colorMode = Number(rawColorMode)
-    const hex = payload.startsWith('0x') ? payload.slice(2) : payload
-    const pixels = new Uint8Array(hex.length / 2)
-    for (let i = 0; i < pixels.length; i++) {
-      pixels[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16)
-    }
+    const token = await fetchIndexerJson(`/tokens/${tokenId}`)
+    const pixels = hexToBytes(String(token.payloadHex || '0x'))
+    const colorMode = Number(token.colorMode || 0)
 
     const png = buildPng(pixels, cols, rows, scale, colorMode)
 
