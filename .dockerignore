@@ -12,3 +12,4 @@ indexer/generated
 !.env.example
 !indexer/.env.local.example
 !indexer/.env.production.example
+!frontend/.env.production.example

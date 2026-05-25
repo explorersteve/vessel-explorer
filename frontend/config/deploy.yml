@@ -1,0 +1,43 @@
+service: vessel-explorer
+
+image: <%= ENV["DOCKER_REGISTRY_USERNAME"] %>/vessel-explorer
+
+servers:
+  web:
+    hosts:
+      - <%= ENV["DEPLOY_HOST"] %>
+    options:
+      network: shared
+
+proxy:
+  ssl: true
+  hosts:
+    - <%= ENV["APP_HOST"] %>
+  app_port: 3000
+  healthcheck:
+    path: /
+    interval: 5
+    timeout: 60
+
+registry:
+  username: <%= ENV["DOCKER_REGISTRY_USERNAME"] %>
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+builder:
+  arch: amd64
+  context: ..
+  dockerfile: ../Dockerfile.frontend
+
+env:
+  clear:
+    NITRO_CLUSTER_WORKERS: '2'
+    NUXT_INDEXER_URL: '<%= ENV["NUXT_INDEXER_URL"] || "" %>'
+    NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPC1: '<%= ENV["NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPC1"] || "" %>'
+    NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPC2: '<%= ENV["NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPC2"] || "" %>'
+    NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPC3: '<%= ENV["NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPC3"] || "" %>'
+  secret:
+    - NUXT_ETHERSCAN_KEY
+
+ssh:
+  user: deploy
