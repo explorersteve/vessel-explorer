@@ -1,0 +1,14 @@
+.git
+.DS_Store
+node_modules
+**/node_modules
+frontend/.nuxt
+frontend/.output
+frontend/.vercel
+indexer/generated
+*.log
+.env
+.env.*
+!.env.example
+!indexer/.env.local.example
+!indexer/.env.production.example

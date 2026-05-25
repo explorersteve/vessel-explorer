@@ -1,0 +1,66 @@
+service: vessel-indexer
+
+image: <%= ENV["DOCKER_REGISTRY_USERNAME"] %>/vessel-indexer
+
+servers:
+  web:
+    hosts:
+      - <%= ENV["DEPLOY_HOST"] %>
+    options:
+      network: shared
+
+proxy:
+  ssl: true
+  hosts:
+    - <%= ENV["INDEXER_HOST"] %>
+  app_port: 42069
+  healthcheck:
+    path: /ready
+    interval: 5
+    timeout: 3600
+
+deploy_timeout: 3600
+
+registry:
+  username: <%= ENV["DOCKER_REGISTRY_USERNAME"] %>
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+builder:
+  arch: amd64
+  context: ..
+  dockerfile: ../Dockerfile.indexer
+
+env:
+  clear:
+    PONDER_TELEMETRY_DISABLED: 'true'
+    PONDER_RPC_REQUESTS_PER_SECOND_1: '2'
+    PONDER_ETH_GET_LOGS_BLOCK_RANGE_1: '250'
+    VESSEL_INDEXER_START_BLOCK: <%= ENV["VESSEL_INDEXER_START_BLOCK"] || "" %>
+    VESSEL_INDEXER_END_BLOCK: <%= ENV["VESSEL_INDEXER_END_BLOCK"] || "" %>
+  secret:
+    - PONDER_RPC_URLS_1
+    - PONDER_RPC_FALLBACK_URLS_1
+    - PONDER_WS_URL_1
+    - DATABASE_URL
+    - DATABASE_SCHEMA
+    - PONDER_VIEWS_SCHEMA
+
+accessories:
+  db:
+    image: postgres:17-alpine
+    host: <%= ENV["DEPLOY_HOST"] %>
+    port: '127.0.0.1:5470:5432'
+    options:
+      network: shared
+    env:
+      clear:
+        POSTGRES_DB: vessel
+        POSTGRES_USER: vessel
+      secret:
+        - POSTGRES_PASSWORD
+    directories:
+      - /home/vessel-indexer-db/data:/var/lib/postgresql/data
+
+ssh:
+  user: root

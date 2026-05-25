@@ -1,0 +1,19 @@
+FROM node:24-alpine AS base
+RUN npm install -g corepack && corepack enable && corepack prepare pnpm@10.32.1 --activate
+WORKDIR /app/indexer
+
+FROM base AS deps
+COPY indexer/package.json indexer/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS build
+COPY indexer ./
+RUN pnpm codegen
+
+FROM base AS production
+COPY --from=build /app/indexer ./
+
+EXPOSE 42069
+# Ponder binds schema metadata to each indexing build. Use a fresh deploy
+# schema by default and keep a stable views schema for zero-downtime swaps.
+CMD pnpm start --schema=${DATABASE_SCHEMA:-vessel_$(printf %s "${KAMAL_VERSION:-local}" | sha1sum | cut -c1-16)} --views-schema=${PONDER_VIEWS_SCHEMA:-vessel}
