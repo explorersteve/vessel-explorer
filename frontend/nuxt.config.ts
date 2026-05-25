@@ -44,7 +44,7 @@ export default defineNuxtConfig({
           mainnet: {
             rpcs: process.env.NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPCS
               || process.env.NUXT_PUBLIC_MACHINE_RPC_URL
-              || '',
+              || 'https://ethereum-rpc.publicnode.com',
           },
         },
         ens: {

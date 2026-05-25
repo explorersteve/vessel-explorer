@@ -29,7 +29,7 @@ Edit `.env` before starting the frontend if needed:
 
 - `NUXT_INDEXER_URL` points the frontend server routes at the Ponder indexer.
 - `NUXT_PUBLIC_MACHINE_RPC_URL` is the optional public browser RPC used only for live machine payload/name reads.
-- `NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPCS` is the optional public read RPC used by `layers.evm` for ENS; it falls back to the machine RPC when unset.
+- `NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPCS` is the optional public read RPC used by `layers.evm` for ENS; it falls back to the machine RPC, then publicnode, when unset.
 
 ### Ponder Indexer
 
