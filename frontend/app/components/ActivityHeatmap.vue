@@ -7,7 +7,6 @@
     <template v-else>
       <div class="heatmap-summary">
         <span>{{ totalLabel }}</span>
-        <span>{{ rangeLabel }}</span>
       </div>
 
       <div class="heatmap-scroll">
@@ -64,10 +63,10 @@ const props = defineProps<{
   error: string | null
 }>()
 
+const HEATMAP_LEVELS = 8
 const weekdayLabels = ['', 'Mon', '', 'Wed', '', 'Fri', '']
 
 const days = computed(() => props.data?.days ?? [])
-const maxCount = computed(() => Math.max(0, props.data?.maxCount ?? 0))
 const leadingBlanks = computed(() => days.value.length ? utcWeekday(days.value[0]!.date) : 0)
 const weekCount = computed(() => Math.max(1, Math.ceil((leadingBlanks.value + days.value.length) / 7)))
 
@@ -76,11 +75,18 @@ const totalLabel = computed(() => {
   return `${total.toLocaleString()} ${total === 1 ? 'interaction' : 'interactions'}`
 })
 
-const rangeLabel = computed(() => {
-  const start = props.data?.startDate || days.value[0]?.date
-  const end = props.data?.endDate || days.value.at(-1)?.date
-  if (!start || !end) return ''
-  return `${formatDate(start)} -> ${formatDate(end)}`
+const activityThresholds = computed(() => {
+  const counts = days.value
+    .map((day) => day.count)
+    .filter((count) => count > 0)
+    .sort((a, b) => a - b)
+
+  if (!counts.length) return []
+
+  return Array.from({ length: HEATMAP_LEVELS }, (_, index) => {
+    const position = Math.ceil(((index + 1) / HEATMAP_LEVELS) * counts.length) - 1
+    return counts[Math.min(counts.length - 1, Math.max(0, position))]!
+  })
 })
 
 const monthLabels = computed(() => {
@@ -114,12 +120,9 @@ const monthLabels = computed(() => {
 })
 
 function levelFor(count: number) {
-  if (count <= 0 || maxCount.value <= 0) return 0
-  const ratio = count / maxCount.value
-  if (ratio <= 0.25) return 1
-  if (ratio <= 0.5) return 2
-  if (ratio <= 0.75) return 3
-  return 4
+  if (count <= 0) return 0
+  const level = activityThresholds.value.findIndex((threshold) => count <= threshold)
+  return level === -1 ? HEATMAP_LEVELS : level + 1
 }
 
 function dayTitle(day: DailyActivityDay, index: number) {
@@ -160,7 +163,7 @@ function formatDate(dateKey: string) {
 .heatmap-summary {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 1rem;
   margin-bottom: 0.85rem;
   color: var(--muted);
@@ -228,18 +231,34 @@ function formatDate(dateKey: string) {
 }
 
 .heatmap-day.level-1 {
-  background: color-mix(in srgb, var(--color-vault) 18%, var(--background));
+  background: color-mix(in srgb, var(--color-vault) 12%, var(--background));
 }
 
 .heatmap-day.level-2 {
-  background: color-mix(in srgb, var(--color-vault) 36%, var(--background));
+  background: color-mix(in srgb, var(--color-vault) 20%, var(--background));
 }
 
 .heatmap-day.level-3 {
-  background: color-mix(in srgb, var(--color-vault) 58%, var(--background));
+  background: color-mix(in srgb, var(--color-vault) 30%, var(--background));
 }
 
 .heatmap-day.level-4 {
+  background: color-mix(in srgb, var(--color-vault) 42%, var(--background));
+}
+
+.heatmap-day.level-5 {
+  background: color-mix(in srgb, var(--color-vault) 55%, var(--background));
+}
+
+.heatmap-day.level-6 {
+  background: color-mix(in srgb, var(--color-vault) 68%, var(--background));
+}
+
+.heatmap-day.level-7 {
+  background: color-mix(in srgb, var(--color-vault) 82%, var(--background));
+}
+
+.heatmap-day.level-8 {
   background: var(--color-vault);
 }
 
