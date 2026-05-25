@@ -65,7 +65,7 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
 import { byteToRGB, getGridDimensions, renderToCanvas, type ColorMode } from '~/utils/vessel'
-import { bytesFromHex, fetchAllTokenRows, fetchTokensByIds } from '~/utils/indexer'
+import { bytesFromHex, fetchAllTokenRows, fetchGridSnapshot, fetchTokensByIds } from '~/utils/indexer'
 
 const router = useRouter()
 
@@ -211,6 +211,8 @@ const typeCache = reactive(new Map<number, string>())
 const colorModeCache = reactive(new Map<number, ColorMode>())
 const allClaimedPayloadsLoading = ref(false)
 const allClaimedPayloadsLoaded = ref(false)
+const gridSnapshotLoading = ref(false)
+const gridSnapshotLoaded = ref(false)
 const overviewTileCache = new Map<string, ImageData>()
 const MAX_TILE_CACHE_SIZE = 2000
 
@@ -236,6 +238,8 @@ function cellCanvasRef(id: number) {
 let currentToken = 0
 
 async function loadVisible() {
+  if (gridSnapshotLoaded.value) return
+
   const token = ++currentToken
 
   const ids = prioritizedIds.value
@@ -259,6 +263,39 @@ async function loadVisible() {
 }
 
 let allClaimedToken = 0
+
+async function loadGridSnapshot() {
+  if (gridSnapshotLoaded.value) return true
+  if (gridSnapshotLoading.value) return false
+
+  gridSnapshotLoading.value = true
+  try {
+    const snapshot = await fetchGridSnapshot()
+    const set = new Set<number>()
+
+    for (const row of snapshot.rows) {
+      const id = Number(row.id)
+      if (!Number.isInteger(id)) continue
+
+      set.add(id)
+      if (row.type) typeCache.set(id, row.type)
+      colorModeCache.set(id, Number(row.colorMode || 0) as ColorMode)
+
+      const bytes = bytesFromHex(row.payloadHex)
+      if (bytes.length > 0) payloadCache.set(id, bytes)
+    }
+
+    claimedSet.value = set
+    allClaimedPayloadsLoaded.value = true
+    gridSnapshotLoaded.value = true
+    scheduleOverviewRender()
+    return true
+  } catch {
+    return false
+  } finally {
+    gridSnapshotLoading.value = false
+  }
+}
 
 async function loadClaimedBatch(ids: number[], token: number) {
   for (let i = 0; i < ids.length && token === allClaimedToken; i += 100) {
@@ -643,28 +680,30 @@ onMounted(async () => {
     scrollLeft.value = scrollContainer.value.scrollLeft
   }
 
-  // Load claimed set then start loading
-  try {
-    const claimedRows = await fetchAllTokenRows({
-      claim: 'claimed',
-      sort: 'id',
-      dir: 'asc',
-      pageSize: 250,
-    })
-    const set = new Set<number>()
-    for (const row of claimedRows) {
-      set.add(Number(row.id))
-      if (row.type) typeCache.set(Number(row.id), row.type)
-    }
-    claimedSet.value = set
-    allClaimedPayloadsLoaded.value = false
-    if (viewAllMode.value) {
-      void loadAllClaimedPayloads()
-    }
-  } catch { /* silently fail */ }
+  const snapshotLoaded = await loadGridSnapshot()
+  if (!snapshotLoaded) {
+    try {
+      const claimedRows = await fetchAllTokenRows({
+        claim: 'claimed',
+        sort: 'id',
+        dir: 'asc',
+        pageSize: 250,
+      })
+      const set = new Set<number>()
+      for (const row of claimedRows) {
+        set.add(Number(row.id))
+        if (row.type) typeCache.set(Number(row.id), row.type)
+      }
+      claimedSet.value = set
+      allClaimedPayloadsLoaded.value = false
+      if (viewAllMode.value) {
+        void loadAllClaimedPayloads()
+      }
+    } catch { /* silently fail */ }
+  }
 
   hasMounted = true
-  loadVisible()
+  if (!snapshotLoaded) loadVisible()
 })
 
 onUnmounted(() => {

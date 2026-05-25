@@ -50,6 +50,20 @@ export interface HolderRow {
   empty: number
 }
 
+export interface GridSnapshotRow {
+  id: number
+  type: string | null
+  payloadHex: string
+  payloadBytes: number
+  colorMode: ColorMode | null
+}
+
+export interface GridSnapshot {
+  rows: GridSnapshotRow[]
+  total: number
+  source: 'ponder'
+}
+
 type QueryValue = string | number | boolean | null | undefined
 
 export function bytesFromHex(hex: string | null | undefined) {
@@ -108,4 +122,21 @@ export async function fetchHolders(limit = 500) {
     query: { limit },
   })
   return Array.isArray(data.rows) ? data.rows : []
+}
+
+export async function fetchGridSnapshot() {
+  const data = await $fetch<GridSnapshot>('/api/grid')
+  return {
+    rows: Array.isArray(data.rows)
+      ? data.rows.map((row) => ({
+          id: Number(row.id),
+          type: row.type || null,
+          payloadHex: String(row.payloadHex || '0x'),
+          payloadBytes: Number(row.payloadBytes || 0),
+          colorMode: row.colorMode == null ? null : Number(row.colorMode) as ColorMode,
+        }))
+      : [],
+    total: Number(data.total || 0),
+    source: 'ponder' as const,
+  }
 }

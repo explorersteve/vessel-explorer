@@ -1,4 +1,7 @@
-export default defineEventHandler(async (event) => {
+const TRANSFERS_CACHE_SECONDS = 30
+
+export default defineCachedEventHandler(async (event) => {
+  setApiCacheHeaders(event, TRANSFERS_CACHE_SECONDS)
   const query = getQuery(event)
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query)) {
@@ -10,4 +13,4 @@ export default defineEventHandler(async (event) => {
   }
 
   return await fetchIndexerJson('/transfers', params)
-})
+}, apiCacheOptions('vessel-transfers', TRANSFERS_CACHE_SECONDS))
