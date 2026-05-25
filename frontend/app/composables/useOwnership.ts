@@ -1,5 +1,4 @@
-import { computeOwnership } from '~/utils/vessel'
-import { type TokenTransfer } from '~/utils/etherscan'
+import { fetchAllTokenRows } from '~/utils/indexer'
 
 export interface OwnerTokens {
   ownership: Map<string, string>
@@ -10,8 +9,7 @@ export interface OwnerTokens {
 let globalCache: Promise<OwnerTokens> | null = null
 
 /**
- * Fetch all transfers (optionally filtered by address) and compute
- * the current ownership map via transfer replay.
+ * Fetch indexed token ownership from Ponder.
  *
  * Returns:
  *  - ownership: Map<tokenId, ownerAddress>
@@ -32,9 +30,17 @@ export async function fetchOwnership(address?: string): Promise<OwnerTokens> {
 }
 
 async function _fetchOwnership(address?: string): Promise<OwnerTokens> {
-  const transfers = await fetchTransfers(address)
-
-  const ownership = computeOwnership(transfers)
+  const rows = await fetchAllTokenRows({
+    claim: 'claimed',
+    owner: address,
+    sort: 'id',
+    dir: 'asc',
+    pageSize: 250,
+  })
+  const ownership = new Map<string, string>()
+  for (const row of rows) {
+    if (row.owner) ownership.set(String(row.id), row.owner.toLowerCase())
+  }
 
   const ownerTokens = new Map<string, string[]>()
   for (const [tokenId, owner] of ownership.entries()) {
@@ -47,27 +53,6 @@ async function _fetchOwnership(address?: string): Promise<OwnerTokens> {
   }
 
   return { ownership, ownerTokens }
-}
-
-async function fetchTransfers(address?: string): Promise<TokenTransfer[]> {
-  const transfers: TokenTransfer[] = []
-  const pageSize = 10000
-
-  for (let page = 1; page <= 20; page++) {
-    const params = new URLSearchParams({
-      page: String(page),
-      offset: String(pageSize),
-    })
-    if (address) params.set('address', address)
-
-    const res = await fetch(`/api/transfers?${params.toString()}`)
-    const pageTransfers = await res.json()
-    if (!Array.isArray(pageTransfers) || pageTransfers.length === 0) break
-    transfers.push(...pageTransfers)
-    if (pageTransfers.length < pageSize) break
-  }
-
-  return transfers
 }
 
 /**

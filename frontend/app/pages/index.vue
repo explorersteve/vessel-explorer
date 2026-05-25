@@ -24,7 +24,7 @@
 
       <!-- Holders tab -->
       <div v-if="activeTab === 'holders'">
-        <div v-if="holdersLoading" class="feed-status">loading holders...</div>
+        <div v-if="holdersLoading && holders.length === 0" class="feed-status">loading holders...</div>
         <div v-else-if="holdersError" class="feed-status feed-error">{{ holdersError }}</div>
         <div v-else-if="holders.length === 0" class="feed-status">no holders yet</div>
         <div v-else class="feed-table">
@@ -48,9 +48,9 @@
               </NuxtLink>
             </span>
             <span class="col-stat">{{ holder.count }}</span>
-            <span class="col-stat" :class="{ dimmed: !holder.typesLoaded }">{{ holder.typesLoaded ? (holder.machines ?? '-') : '...' }}</span>
-            <span class="col-stat" :class="{ dimmed: !holder.typesLoaded }">{{ holder.typesLoaded ? (holder.vaults ?? '-') : '...' }}</span>
-            <span class="col-stat" :class="{ dimmed: !holder.typesLoaded }">{{ holder.typesLoaded ? (holder.capsules ?? '-') : '...' }}</span>
+            <span class="col-stat">{{ holder.machines }}</span>
+            <span class="col-stat">{{ holder.vaults }}</span>
+            <span class="col-stat">{{ holder.capsules }}</span>
           </div>
         </div>
       </div>
@@ -126,14 +126,11 @@
 </template>
 
 <script setup lang="ts">
-import { readContract } from '@wagmi/core'
-import { useConfig } from '@wagmi/vue'
-import { fetchVesselActivity, type VesselTransaction } from '~/utils/etherscan'
-import { VESSEL_ADDRESS, VESSEL_ABI, EXPLORER_BASE, hexToBytes, renderToCanvas, type ColorMode } from '~/utils/vessel'
-import { fetchOwnership } from '~/composables/useOwnership'
+import { fetchVesselActivity, type VesselTransaction } from '~/utils/activity'
+import { EXPLORER_BASE, renderToCanvas, type ColorMode } from '~/utils/vessel'
+import { bytesFromHex, fetchHolders, fetchToken } from '~/utils/indexer'
 
 const router = useRouter()
-const wagmiConfig = useConfig()
 
 const searchQuery = ref('')
 const activeTab = ref<'activity' | 'holders'>('activity')
@@ -152,78 +149,46 @@ const activeFilters = ref(new Set<string>(actionTypes))
 interface Holder {
   address: string
   count: number
-  machines: number | null
-  vaults: number | null
-  capsules: number | null
-  typesLoaded: boolean
+  machines: number
+  vaults: number
+  capsules: number
 }
 const holders = ref<Holder[]>([])
 const holdersLoading = ref(false)
 const holdersLoaded = ref(false)
 const holdersError = ref<string | null>(null)
+let holdersRequest: Promise<void> | null = null
 
 async function loadHolders() {
+  if (holdersLoaded.value) return
+  if (holdersRequest) return await holdersRequest
+
   holdersLoading.value = true
   holdersError.value = null
-  try {
-    const { ownerTokens } = await fetchOwnership()
-
-    holders.value = [...ownerTokens.entries()]
-      .map(([address, tokens]) => ({
-        address,
-        count: tokens.length,
-        machines: null,
-        vaults: null,
-        capsules: null,
-        typesLoaded: false,
+  holdersRequest = (async () => {
+    try {
+      holders.value = (await fetchHolders(500)).map((holder) => ({
+        address: holder.address,
+        count: Number(holder.count || 0),
+        machines: Number(holder.machines || 0),
+        vaults: Number(holder.vaults || 0),
+        capsules: Number(holder.capsules || 0),
       }))
-      .sort((a, b) => b.count - a.count)
-
-    holdersLoaded.value = true
-
-    for (let hi = 0; hi < holders.value.length; hi++) {
-      const h = holders.value[hi]
-      if (!h) continue
-      const tokens = ownerTokens.get(h.address) || []
-      let machines = 0, vaults = 0, capsules = 0
-
-      for (const tokenId of tokens) {
-        try {
-          const typeStr = await readContract(wagmiConfig, {
-            address: VESSEL_ADDRESS,
-            abi: VESSEL_ABI,
-            functionName: 'craftToType',
-            args: [BigInt(tokenId)],
-          }) as string
-
-          const t = typeStr.toLowerCase()
-          if (t === 'machine') machines++
-          else if (t === 'vault') vaults++
-          else capsules++
-        } catch {
-          // skip
-        }
-      }
-
-      holders.value[hi] = {
-        address: h.address,
-        count: h.count,
-        machines,
-        vaults,
-        capsules,
-        typesLoaded: true,
-      }
+      holdersLoaded.value = true
+    } catch (e: any) {
+      holdersError.value = e?.data?.message || e?.message || 'failed to load holders'
+    } finally {
+      holdersLoading.value = false
+      holdersRequest = null
     }
-  } catch (e: any) {
-    holdersError.value = e?.data?.message || e?.message || 'failed to load holders'
-  } finally {
-    holdersLoading.value = false
-  }
+  })()
+
+  return await holdersRequest
 }
 
 watch(activeTab, async (tab) => {
   if (tab === 'holders' && !holdersLoaded.value) {
-    await loadHolders()
+    void loadHolders()
   }
 })
 
@@ -284,9 +249,9 @@ const colorModeCache = new Map<string, ColorMode>()
 function goToVessel() {
   const q = searchQuery.value.trim()
   if (!q) return
-  if ((q.startsWith('0x') && q.length === 42) || q.includes('.eth')) {
+  if (q.startsWith('0x') && q.length === 42) {
     router.push(`/address/${q}`)
-  } else {
+  } else if (/^\d+$/.test(q)) {
     router.push(`/${q}`)
   }
 }
@@ -319,23 +284,10 @@ async function showPreview(vesselId: string, event: MouseEvent) {
   let colorMode = colorModeCache.get(vesselId) ?? 0 as ColorMode
   if (!payload) {
     try {
-      const [raw, cm] = await Promise.all([
-        readContract(wagmiConfig, {
-          address: VESSEL_ADDRESS,
-          abi: VESSEL_ABI,
-          functionName: 'craftToPayload',
-          args: [BigInt(vesselId)],
-        }) as Promise<string>,
-        readContract(wagmiConfig, {
-          address: VESSEL_ADDRESS,
-          abi: VESSEL_ABI,
-          functionName: 'craftToColorMode',
-          args: [BigInt(vesselId)],
-        }).catch(() => 0) as Promise<number>,
-      ])
-      colorMode = cm as ColorMode
+      const token = await fetchToken(Number(vesselId))
+      colorMode = Number(token.colorMode || 0) as ColorMode
       colorModeCache.set(vesselId, colorMode)
-      const bytes = hexToBytes(raw)
+      const bytes = bytesFromHex(token.payloadHex)
       if (bytes.length > 0) {
         payload = bytes
         payloadCache.set(vesselId, payload)
@@ -399,6 +351,8 @@ async function loadMore() {
 }
 
 onMounted(async () => {
+  void loadHolders()
+
   try {
     activity.value = await loadPage(1)
   } catch (e: any) {

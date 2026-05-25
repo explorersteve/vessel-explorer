@@ -3,10 +3,10 @@
     <NuxtLink to="/" class="app-title">vessel explorer</NuxtLink>
     <Tooltip v-if="statsLoading || claimed != null || statsError" side="bottom" align="center" :side-offset="8" :delay-duration="100" :arrow="false">
       <template #trigger>
-        <span class="header-stats" @mouseenter="loadFilledBytes">
+        <span class="header-stats">
           <template v-if="statsLoading">loading stats...</template>
           <template v-else-if="statsError">{{ statsError }}</template>
-          <template v-else>{{ claimed }} claimed<template v-if="blocksSinceDeploy != null"> since {{ blocksSinceDeploy.toLocaleString() }} blocks</template></template>
+          <template v-else>{{ claimed }} claimed</template>
         </span>
       </template>
       <div class="stats-popover">
@@ -25,7 +25,7 @@
         <div class="stats-row">
           <span class="stats-label">bytes filled</span>
           <span class="stats-value">
-            <template v-if="filledBytes != null">{{ formatBytes(filledBytes) }}<span v-if="filledLoading" class="spinner" /></template>
+            <template v-if="filledBytes != null">{{ formatBytes(filledBytes) }}</template>
             <template v-else>loading...</template>
           </span>
         </div>
@@ -59,32 +59,17 @@
 </template>
 
 <script setup lang="ts">
-import { readContract, getBlockNumber } from '@wagmi/core'
-import { useConfig } from '@wagmi/vue'
-import { VESSEL_ADDRESS, VESSEL_ABI, hexToBytes } from '~/utils/vessel'
-import { fetchOwnership } from '~/composables/useOwnership'
-
-const wagmiConfig = useConfig()
 const COLOR_MODE_KEY = 'vessel-color-mode'
 const isDark = ref(true)
 const claimed = ref<number | null>(null)
-const claimedIds = ref<string[]>([])
 const holderCount = ref(0)
 const largestHolder = ref<{ address: string; count: number } | null>(null)
 const filledBytes = ref<number | null>(null)
-const filledLoading = ref(false)
-const blocksSinceDeploy = ref<number | null>(null)
 const statsLoading = ref(true)
 const statsError = ref<string | null>(null)
-let blocksTimer: ReturnType<typeof setInterval> | null = null
 
 const TOTAL_CAPACITY = 50_005_000
-
-const claimedCapacity = computed(() => {
-  let sum = 0
-  for (const id of claimedIds.value) sum += Number(id)
-  return sum
-})
+const claimedCapacity = ref(0)
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`
@@ -100,79 +85,25 @@ onMounted(async () => {
   isDark.value = shouldBeDark
 
   try {
-    if (claimed.value == null) {
-      const [claimedCount] = await Promise.all([
-        readContract(wagmiConfig, {
-          address: VESSEL_ADDRESS,
-          abi: VESSEL_ABI,
-          functionName: 'claimedCount',
-        }) as Promise<bigint>,
-      ])
-      claimed.value = Number(claimedCount)
-    }
-    const { ownership, ownerTokens } = await fetchOwnership()
-    claimedIds.value = [...ownership.keys()]
-    holderCount.value = ownerTokens.size
-
-    let maxCount = 0
-    let maxAddr = ''
-    for (const [addr, tokens] of ownerTokens.entries()) {
-      if (tokens.length > maxCount) {
-        maxCount = tokens.length
-        maxAddr = addr
-      }
-    }
-    if (maxAddr) largestHolder.value = { address: maxAddr, count: maxCount }
-
-    if (blocksSinceDeploy.value == null) {
-      const DEPLOY_BLOCK = 24624612n
-      const currentBlock = await getBlockNumber(wagmiConfig)
-      blocksSinceDeploy.value = Number(currentBlock - DEPLOY_BLOCK)
-    }
+    const [stats, holders] = await Promise.all([
+      $fetch<any>('/api/stats'),
+      $fetch<{ rows: Array<{ address: string; count: number }> }>('/api/holders', {
+        query: { limit: 1 },
+      }),
+    ])
+    const tokens = stats?.tokens || {}
+    claimed.value = Number(tokens.claimed || 0)
+    claimedCapacity.value = Number(tokens.claimedCapacityBytes || 0)
+    filledBytes.value = Number(tokens.filledBytes || 0)
+    holderCount.value = Number(tokens.uniqueHolders || 0)
+    const top = holders?.rows?.[0]
+    largestHolder.value = top ? { address: top.address, count: Number(top.count || 0) } : null
   } catch {
     if (claimed.value == null) statsError.value = 'stats unavailable'
   } finally {
     statsLoading.value = false
   }
-
-  if (blocksSinceDeploy.value != null) {
-    blocksTimer = setInterval(() => { blocksSinceDeploy.value!++ }, 12_000)
-  }
 })
-
-onUnmounted(() => {
-  if (blocksTimer != null) clearInterval(blocksTimer)
-})
-
-// Lazy load filled bytes on first hover
-async function loadFilledBytes() {
-  if (filledLoading.value || filledBytes.value != null || claimedIds.value.length === 0) return
-  filledLoading.value = true
-
-  try {
-    let total = 0
-    const BATCH = 20
-    for (let i = 0; i < claimedIds.value.length; i += BATCH) {
-      const batch = claimedIds.value.slice(i, i + BATCH)
-      const results = await Promise.all(
-        batch.map(id =>
-          readContract(wagmiConfig, {
-            address: VESSEL_ADDRESS,
-            abi: VESSEL_ABI,
-            functionName: 'craftToPayload',
-            args: [BigInt(id)],
-          }).catch(() => '0x') as Promise<string>
-        )
-      )
-      for (const raw of results) {
-        total += hexToBytes(raw).length
-      }
-      filledBytes.value = total
-    }
-  } finally {
-    filledLoading.value = false
-  }
-}
 
 function toggleDark() {
   const root = document.documentElement
@@ -252,22 +183,6 @@ function toggleDark() {
   display: flex;
   align-items: center;
   gap: 1rem;
-}
-
-.spinner {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin-left: 4px;
-  border: 1.5px solid var(--text-faint);
-  border-top-color: var(--color);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  vertical-align: -1px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 640px) {

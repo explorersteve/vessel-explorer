@@ -1,11 +1,9 @@
 <template>
   <a v-if="external" :href="`${EXPLORER_BASE}/address/${address}`" target="_blank" rel="noopener" class="address-display">
-    <template v-if="ens?.ens">{{ ens.ens }}</template>
-    <template v-else>{{ shortened }}</template>
+    {{ shortened }}
   </a>
   <NuxtLink v-else :to="`/address/${address}`" class="address-display">
-    <template v-if="ens?.ens">{{ ens.ens }}</template>
-    <template v-else>{{ shortened }}</template>
+    {{ shortened }}
   </NuxtLink>
 </template>
 
@@ -18,8 +16,6 @@ const props = withDefaults(defineProps<{
 }>(), {
   external: false,
 })
-
-const { data: ens } = useEns(() => props.address)
 
 const shortened = computed(() => shortenAddress(props.address))
 </script>
