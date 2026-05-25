@@ -2,7 +2,7 @@
 
 ## Overview
 
-Read-only Nuxt 3 SPA for exploring THE_VESSEL on-chain storage protocol. No wallet connect, no transactions. All data read from Ethereum mainnet via public RPC + Etherscan API.
+Read-only Nuxt SPA for exploring THE_VESSEL on-chain storage protocol. No wallet connect, no transactions. Runtime data is served primarily by a Ponder indexer backed by Postgres, with legacy Postgres/Etherscan/RPC fallbacks still available.
 
 ## Contracts
 
@@ -94,18 +94,38 @@ Examples: vessel #2623 = 52x51, machine #5246 = 73x72.
 ```
 Client                    Server Routes              External
 ──────                    ─────────────              ────────
-pages/*.vue          →    /api/activity.get.ts   →   Etherscan v2 API
-composables/*.ts     →    /api/transfers.get.ts  →   Etherscan v2 API
+pages/*.vue          →    /api/activity.get.ts   →   Ponder /activity, Etherscan fallback
+composables/*.ts     →    /api/transfers.get.ts  →   Ponder /transfers, Etherscan fallback
+                     →    /api/tokens.get.ts     →   Ponder /tokens, Postgres fallback
                      →    /api/og/[id].get.ts    →   Ethereum RPC (payload → BMP)
 readContract()       →    (direct)               →   Ethereum RPC
 ```
 
 Etherscan API key is server-side only (`NUXT_ETHERSCAN_KEY`, no `PUBLIC` prefix). RPC calls go direct from client via wagmi/viem.
 
+When `NUXT_INDEXER_URL` is configured, Nuxt server routes use the Ponder API first. The indexer tracks protocol state, all 10,000 tokens, payload writes, vault entries, transfers, approvals, holders, and activity from deployment block `24524524`. Event handlers use block-pinned contract reads so historical replay stores the state as it was at each event.
+
+When only `DATABASE_URL` is configured, the legacy token indexer stores `craftToPayload` in `tokens.payload_data` as `bytea` and keeps `tokens.payload_bytes` as the byte count for filtering/sorting.
+
+## Ponder Indexer
+
+The indexer lives in `indexer/` and exposes:
+
+- REST: `/tokens`, `/tokens/:id`, `/tokens/:id/entries`, `/activity`, `/transfers`, `/holders`, `/stats`
+- Ponder built-ins: `/health`, `/ready`, GraphQL, and SQL
+- Local Postgres via `indexer/docker-compose.yml`
+- Kamal deployment via `indexer/config/deploy.yml` and root `Dockerfile.indexer`
+
+RPC behavior is configured with `PONDER_RPC_URLS_1`,
+`PONDER_RPC_FALLBACK_URLS_1`, `PONDER_RPC_REQUESTS_PER_SECOND_1`, and
+`PONDER_ETH_GET_LOGS_BLOCK_RANGE_1`. `VESSEL_INDEXER_START_BLOCK` and
+`VESSEL_INDEXER_END_BLOCK` exist for bounded local smoke tests only.
+
 ## Stack
 
-- Nuxt 3 SPA (`ssr: false`)
+- Nuxt SPA (`ssr: false`)
+- Ponder 0.16 indexer
 - @1001-digital/layers.evm (ENS resolution, dark/light mode, wagmi config)
 - viem for contract reads
-- Etherscan v2 API (server-proxied, key not exposed to client)
+- Etherscan v2 API fallback (server-proxied, key not exposed to client)
 - Terminal aesthetic: monospace, dark/light mode, minimal UI
