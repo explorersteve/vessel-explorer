@@ -9,9 +9,13 @@
     "preview": "nuxt preview"
   },
   "dependencies": {
-    "@1001-digital/layers.base": "1.2.1",
+    "@1001-digital/components.evm": "^3.6.0",
+    "@1001-digital/layers.evm": "^2.7.12",
+    "@tanstack/vue-query": "5.95.2",
+    "@wagmi/core": "3.4.6",
+    "@wagmi/vue": "0.5.6",
     "nuxt": "^4.3.1",
     "postcss-nesting": "^14.0.0",
-    "viem": "^2.47.0"
+    "viem": "^2.48.4"
   }
 }

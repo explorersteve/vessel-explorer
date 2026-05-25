@@ -10,7 +10,9 @@
 
       <Transition name="vessel-in">
       <div v-if="!resolving && !resolveError" :key="resolvedAddress" class="profile-loaded">
-        <h1 class="profile-title">{{ shortenAddress(resolvedAddress) }}</h1>
+        <h1 class="profile-title">
+          <AddressDisplay :address="resolvedAddress" :link="false" />
+        </h1>
         <div class="profile-address" @click="copyAddress" title="click to copy">{{ resolvedAddress }}</div>
 
         <div v-if="ownedVessels.length > 0" class="profile-stats">
@@ -83,7 +85,7 @@
 <script setup lang="ts">
 import { isAddress } from 'viem'
 import type { ComponentPublicInstance } from 'vue'
-import { shortenAddress, renderToCanvas, type ColorMode } from '~/utils/vessel'
+import { renderToCanvas, type ColorMode } from '~/utils/vessel'
 import { bytesFromHex, fetchAllTokenRows, type TokenRow } from '~/utils/indexer'
 
 async function copyAddress() {
@@ -232,6 +234,10 @@ watch(addr, async (newAddr) => {
   font-size: 18px;
   font-weight: 700;
   margin: 0 0 0.25rem 0;
+}
+
+.profile-title :deep(.address-display) {
+  color: var(--color);
 }
 
 .profile-address {

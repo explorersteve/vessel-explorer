@@ -99,10 +99,11 @@ composables/*.ts     →    /api/transfers.get.ts  →   Ponder /transfers
                      →    /api/holders.get.ts    →   Ponder /holders
                      →    /api/stats.get.ts      →   Ponder /stats
                      →    /api/og/[id].get.ts    →   Ponder /tokens/:id payload
+AddressDisplay.vue   →    layers.evm useEns()    →   reverse ENS via mainnet RPC
 machine detail       →    (direct browser read)  →   Machine contract name()/craftToPayload()
 ```
 
-`NUXT_INDEXER_URL` is required for Nuxt server routes. `NUXT_PUBLIC_MACHINE_RPC_URL` is optional and public; it is used only when viewing a machine vessel because machine contracts can change output without THE_VESSEL emitting a payload write event.
+`NUXT_INDEXER_URL` is required for Nuxt server routes. `NUXT_PUBLIC_MACHINE_RPC_URL` is optional and public; it is used only when viewing a machine vessel because machine contracts can change output without THE_VESSEL emitting a payload write event. `NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPCS` is optional and public for `layers.evm` reverse ENS display names; it falls back to the machine RPC when unset.
 
 The indexer tracks protocol state, all 10,000 tokens, payload writes, vault entries, transfers, approvals, holders, and activity from deployment block `24524524`. Event handlers use block-pinned contract reads so historical replay stores the state as it was at each event.
 
@@ -124,6 +125,6 @@ RPC behavior is configured with `PONDER_RPC_URLS_1`,
 
 - Nuxt SPA (`ssr: false`)
 - Ponder 0.16 indexer
-- @1001-digital/layers.base
+- @1001-digital/layers.evm for base UI, EVM config, and ENS
 - viem for live machine contract reads
 - Terminal aesthetic: monospace, dark/light mode, minimal UI

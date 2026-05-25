@@ -6,8 +6,8 @@ A read-only explorer for [THE_VESSEL](https://evm.now/address/0xECb92Cc7112b80A2
 
 - **[Nuxt 4](https://nuxt.com/)** — Vue framework (SPA mode)
 - **[Ponder](https://ponder.sh/)** — production indexer for token state, payload writes, transfers, holders, and activity
-- **[@1001-digital/layers.base](https://www.npmjs.com/package/@1001-digital/layers.base)** — base UI layer, components, styles, and dark/light mode
-- **[viem](https://viem.sh/)** — live browser reads for machine contract payloads only
+- **[@1001-digital/layers.evm](https://www.npmjs.com/package/@1001-digital/layers.evm)** — base UI layer plus EVM/ENS composables
+- **[viem](https://viem.sh/)** — live browser reads for machine contract payloads
 
 Read-only. No wallet connect, no transactions.
 
@@ -29,6 +29,7 @@ Edit `.env` before starting the frontend if needed:
 
 - `NUXT_INDEXER_URL` points the frontend server routes at the Ponder indexer.
 - `NUXT_PUBLIC_MACHINE_RPC_URL` is the optional public browser RPC used only for live machine payload/name reads.
+- `NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPCS` is the optional public read RPC used by `layers.evm` for ENS; it falls back to the machine RPC when unset.
 
 ### Ponder Indexer
 

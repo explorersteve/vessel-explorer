@@ -101,9 +101,7 @@
               </td>
               <td>{{ claimLabel(row) }}</td>
               <td>
-                <NuxtLink v-if="row.owner" :to="`/address/${row.owner}`" class="table-link">
-                  {{ shortenAddress(row.owner) }}
-                </NuxtLink>
+                <AddressDisplay v-if="row.owner" :address="row.owner" />
                 <span v-else>-</span>
               </td>
               <td :class="typeClass(row.type)">{{ row.type ?? '-' }}</td>
@@ -116,13 +114,17 @@
               <td class="number-cell">{{ formatNullable(row.entryCount) }}</td>
               <td class="number-cell">{{ formatNullable(row.chosenEntry) }}</td>
               <td>
-                <NuxtLink v-if="row.delegate" :to="`/address/${row.delegate}`" class="table-link">
-                  {{ shortenAddress(row.delegate) }}
-                </NuxtLink>
+                <AddressDisplay v-if="row.delegate" :address="row.delegate" />
                 <span v-else>-</span>
               </td>
-              <td>{{ row.machineAddress ? shortenAddress(row.machineAddress) : '-' }}</td>
-              <td>{{ row.chosenMachine ? shortenAddress(row.chosenMachine) : '-' }}</td>
+              <td>
+                <AddressDisplay v-if="row.machineAddress" :address="row.machineAddress" external />
+                <span v-else>-</span>
+              </td>
+              <td>
+                <AddressDisplay v-if="row.chosenMachine" :address="row.chosenMachine" external />
+                <span v-else>-</span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -132,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { colorModeName, shortenAddress, type ColorMode } from '~/utils/vessel'
+import { colorModeName, type ColorMode } from '~/utils/vessel'
 import { fetchTokenPage, type TokenRow } from '~/utils/indexer'
 
 type SortKey =

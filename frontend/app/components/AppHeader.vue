@@ -41,7 +41,7 @@
           <span class="stats-label">largest holder</span>
           <span class="stats-value">
             <NuxtLink :to="`/address/${largestHolder.address}`" class="stats-link">
-              <AddressDisplay :address="largestHolder.address" />
+              <AddressDisplay :address="largestHolder.address" :link="false" />
             </NuxtLink>
             <span class="stat-sep"> ({{ largestHolder.count }})</span>
           </span>

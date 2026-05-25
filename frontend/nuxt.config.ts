@@ -1,6 +1,6 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
-  extends: ['@1001-digital/layers.base'],
+  extends: ['@1001-digital/layers.evm'],
   ssr: false,
   devtools: { enabled: true },
   devServer: {
@@ -38,6 +38,19 @@ export default defineNuxtConfig({
     indexerUrl: '',
     public: {
       machineRpcUrl: '',
+      evm: {
+        walletConnectProjectId: '',
+        chains: {
+          mainnet: {
+            rpcs: process.env.NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPCS
+              || process.env.NUXT_PUBLIC_MACHINE_RPC_URL
+              || '',
+          },
+        },
+        ens: {
+          indexers: '',
+        },
+      },
     },
   },
 })

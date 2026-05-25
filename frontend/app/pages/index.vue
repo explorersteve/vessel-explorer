@@ -44,7 +44,7 @@
             <span class="col-rank">{{ i + 1 }}</span>
             <span class="col-holder">
               <NuxtLink :to="`/address/${holder.address}`" class="vessel-link">
-                <AddressDisplay :address="holder.address" />
+                <AddressDisplay :address="holder.address" :link="false" />
               </NuxtLink>
             </span>
             <span class="col-stat">{{ holder.count }}</span>
