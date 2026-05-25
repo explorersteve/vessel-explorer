@@ -1,0 +1,15 @@
+services:
+  postgres17_vessel_indexer:
+    image: postgres:17-alpine
+    container_name: postgres17_vessel_indexer
+    environment:
+      POSTGRES_USER: vessel
+      POSTGRES_PASSWORD: vessel
+      POSTGRES_DB: vessel
+    ports:
+      - '5470:5432'
+    volumes:
+      - postgres17_vessel_indexer:/var/lib/postgresql/data
+
+volumes:
+  postgres17_vessel_indexer:

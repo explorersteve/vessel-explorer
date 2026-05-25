@@ -1,0 +1,31 @@
+{
+  "name": "@vessel-explorer/indexer",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "ponder dev",
+    "start": "ponder start",
+    "serve": "ponder serve",
+    "db": "ponder db",
+    "codegen": "ponder codegen",
+    "typecheck": "tsc",
+    "kamal:setup": "set -a && . ./.env.production && set +a && kamal setup",
+    "kamal:deploy": "set -a && . ./.env.production && set +a && kamal deploy",
+    "kamal:sh": "set -a && . ./.env.production && set +a && kamal app exec -i --reuse sh"
+  },
+  "dependencies": {
+    "@ponder/utils": "^0.2.18",
+    "hono": "^4.12.22",
+    "ponder": "^0.16.6",
+    "viem": "^2.47.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "dotenv": "^16.6.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.14"
+  }
+}
