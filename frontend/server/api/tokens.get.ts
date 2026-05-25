@@ -22,21 +22,39 @@ const sortColumns: Record<string, string> = {
 }
 
 export default defineEventHandler(async (event) => {
+  const config = useRuntimeConfig()
+  const query = getQuery(event)
+  const indexerUrl = String(config.indexerUrl || process.env.NUXT_INDEXER_URL || '').replace(/\/$/, '')
+  if (indexerUrl) {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(query)) {
+      if (Array.isArray(value)) {
+        for (const item of value) params.append(key, String(item))
+      } else if (value != null) {
+        params.set(key, String(value))
+      }
+    }
+
+    const response = await fetch(`${indexerUrl}/tokens?${params.toString()}`).catch(() => null)
+    if (response?.ok) return await response.json()
+  }
+
   const sql = getDatabase()
   if (!sql) {
     throw createError({
       statusCode: 503,
-      message: 'database read model is unavailable; set DATABASE_URL and run pnpm db:backfill',
+      message: 'token index is unavailable; set NUXT_INDEXER_URL or configure DATABASE_URL and run pnpm db:backfill',
     })
   }
 
-  const query = getQuery(event)
   const page = Math.max(1, Number(query.page) || 1)
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(query.pageSize) || 50))
   const offset = (page - 1) * pageSize
   const sortKey = String(query.sort || 'id')
   const sortColumn = sortColumns[sortKey] || sortColumns.id
   const sortDir = String(query.dir).toLowerCase() === 'desc' ? 'desc' : 'asc'
+  const includePayload = ['1', 'true', 'yes'].includes(String(query.includePayload || '').toLowerCase())
+  const payloadSelect = includePayload ? ', encode(payload_data, \'hex\') as "payloadHex"' : ''
   const params: unknown[] = []
   const where: string[] = []
 
@@ -102,6 +120,7 @@ export default defineEventHandler(async (event) => {
           delegate_address as "delegate",
           machine_address as "machineAddress",
           chosen_machine_address as "chosenMachine"
+          ${payloadSelect}
         from tokens
         ${whereSql}
         order by ${sortColumn} ${sortDir} nulls last, id asc
