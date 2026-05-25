@@ -15,7 +15,7 @@ proxy:
     - <%= ENV["INDEXER_HOST"] %>
   app_port: 42069
   healthcheck:
-    path: /ready
+    path: /health
     interval: 5
     timeout: 3600
 
@@ -34,8 +34,8 @@ builder:
 env:
   clear:
     PONDER_TELEMETRY_DISABLED: 'true'
-    PONDER_RPC_REQUESTS_PER_SECOND_1: '2'
-    PONDER_ETH_GET_LOGS_BLOCK_RANGE_1: '250'
+    PONDER_RPC_REQUESTS_PER_SECOND_1: '<%= ENV["PONDER_RPC_REQUESTS_PER_SECOND_1"] || "50" %>'
+    PONDER_ETH_GET_LOGS_BLOCK_RANGE_1: '<%= ENV["PONDER_ETH_GET_LOGS_BLOCK_RANGE_1"] || "5000" %>'
     VESSEL_INDEXER_START_BLOCK: '<%= ENV["VESSEL_INDEXER_START_BLOCK"] || "" %>'
     VESSEL_INDEXER_END_BLOCK: '<%= ENV["VESSEL_INDEXER_END_BLOCK"] || "" %>'
   secret:
