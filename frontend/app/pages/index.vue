@@ -20,6 +20,8 @@
         <span :class="['tab-link', { active: activeTab === 'activity' }]" @click="activeTab = 'activity'">recent vessel activity</span>
         <span class="tab-divider">/</span>
         <span :class="['tab-link', { active: activeTab === 'holders' }]" @click="activeTab = 'holders'">holders</span>
+        <span class="tab-divider">/</span>
+        <span :class="['tab-link', { active: activeTab === 'heatmap' }]" @click="activeTab = 'heatmap'">heatmap</span>
       </div>
 
       <!-- Holders tab -->
@@ -54,6 +56,14 @@
           </div>
         </div>
       </div>
+
+      <!-- Heatmap tab -->
+      <ActivityHeatmap
+        v-else-if="activeTab === 'heatmap'"
+        :data="heatmap"
+        :loading="heatmapLoading"
+        :error="heatmapError"
+      />
 
       <!-- Activity tab -->
       <div v-else>
@@ -126,14 +136,14 @@
 </template>
 
 <script setup lang="ts">
-import { fetchVesselActivity, type VesselTransaction } from '~/utils/activity'
+import { fetchDailyActivity, fetchVesselActivity, type DailyActivityResponse, type VesselTransaction } from '~/utils/activity'
 import { EXPLORER_BASE, renderToCanvas, type ColorMode } from '~/utils/vessel'
 import { bytesFromHex, fetchHolders, fetchToken } from '~/utils/indexer'
 
 const router = useRouter()
 
 const searchQuery = ref('')
-const activeTab = ref<'activity' | 'holders'>('activity')
+const activeTab = ref<'activity' | 'holders' | 'heatmap'>('activity')
 const activity = ref<VesselTransaction[]>([])
 const feedLoading = ref(true)
 const feedError = ref<string | null>(null)
@@ -158,6 +168,11 @@ const holdersLoading = ref(false)
 const holdersLoaded = ref(false)
 const holdersError = ref<string | null>(null)
 let holdersRequest: Promise<void> | null = null
+const heatmap = ref<DailyActivityResponse | null>(null)
+const heatmapLoading = ref(false)
+const heatmapLoaded = ref(false)
+const heatmapError = ref<string | null>(null)
+let heatmapRequest: Promise<void> | null = null
 
 async function loadHolders() {
   if (holdersLoaded.value) return
@@ -186,9 +201,33 @@ async function loadHolders() {
   return await holdersRequest
 }
 
+async function loadHeatmap() {
+  if (heatmapLoaded.value) return
+  if (heatmapRequest) return await heatmapRequest
+
+  heatmapLoading.value = true
+  heatmapError.value = null
+  heatmapRequest = (async () => {
+    try {
+      heatmap.value = await fetchDailyActivity()
+      heatmapLoaded.value = true
+    } catch (e: any) {
+      heatmapError.value = e?.data?.message || e?.message || 'failed to load heatmap'
+    } finally {
+      heatmapLoading.value = false
+      heatmapRequest = null
+    }
+  })()
+
+  return await heatmapRequest
+}
+
 watch(activeTab, async (tab) => {
   if (tab === 'holders' && !holdersLoaded.value) {
     void loadHolders()
+  }
+  if (tab === 'heatmap' && !heatmapLoaded.value) {
+    void loadHeatmap()
   }
 })
 
