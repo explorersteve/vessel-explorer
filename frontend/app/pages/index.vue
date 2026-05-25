@@ -390,8 +390,6 @@ async function loadMore() {
 }
 
 onMounted(async () => {
-  void loadHolders()
-
   try {
     activity.value = await loadPage(1)
   } catch (e: any) {

@@ -61,15 +61,16 @@
 <script setup lang="ts">
 const COLOR_MODE_KEY = 'vessel-color-mode'
 const isDark = ref(true)
-const claimed = ref<number | null>(null)
-const holderCount = ref(0)
-const largestHolder = ref<{ address: string; count: number } | null>(null)
-const filledBytes = ref<number | null>(null)
-const statsLoading = ref(true)
-const statsError = ref<string | null>(null)
+const { stats, loadHeaderStats } = useHeaderStats()
+const claimed = computed(() => stats.value.claimed)
+const holderCount = computed(() => stats.value.holderCount)
+const largestHolder = computed(() => stats.value.largestHolder)
+const filledBytes = computed(() => stats.value.filledBytes)
+const statsLoading = computed(() => stats.value.loading || (!stats.value.loaded && !stats.value.error))
+const statsError = computed(() => stats.value.error)
 
 const TOTAL_CAPACITY = 50_005_000
-const claimedCapacity = ref(0)
+const claimedCapacity = computed(() => stats.value.claimedCapacity)
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`
@@ -84,25 +85,7 @@ onMounted(async () => {
   root.classList.toggle('dark', shouldBeDark)
   isDark.value = shouldBeDark
 
-  try {
-    const [stats, holders] = await Promise.all([
-      $fetch<any>('/api/stats'),
-      $fetch<{ rows: Array<{ address: string; count: number }> }>('/api/holders', {
-        query: { limit: 1 },
-      }),
-    ])
-    const tokens = stats?.tokens || {}
-    claimed.value = Number(tokens.claimed || 0)
-    claimedCapacity.value = Number(tokens.claimedCapacityBytes || 0)
-    filledBytes.value = Number(tokens.filledBytes || 0)
-    holderCount.value = Number(tokens.uniqueHolders || 0)
-    const top = holders?.rows?.[0]
-    largestHolder.value = top ? { address: top.address, count: Number(top.count || 0) } : null
-  } catch {
-    if (claimed.value == null) statsError.value = 'stats unavailable'
-  } finally {
-    statsLoading.value = false
-  }
+  void loadHeaderStats()
 })
 
 function toggleDark() {
