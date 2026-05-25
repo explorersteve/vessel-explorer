@@ -132,10 +132,8 @@
 </template>
 
 <script setup lang="ts">
-import { readContracts } from '@wagmi/core'
-import { useConfig } from '@wagmi/vue'
-import { VESSEL_ADDRESS, VESSEL_ABI, colorModeName, hexToBytes, shortenAddress, type ColorMode } from '~/utils/vessel'
-import { fetchOwnership } from '~/composables/useOwnership'
+import { colorModeName, shortenAddress, type ColorMode } from '~/utils/vessel'
+import { fetchTokenPage, type TokenRow } from '~/utils/indexer'
 
 type SortKey =
   | 'id'
@@ -154,60 +152,25 @@ type SortKey =
   | 'machineAddress'
   | 'chosenMachine'
 
-interface VesselRow {
-  id: number
+interface VesselRow extends Omit<TokenRow, 'claimed' | 'filled' | 'payloadBytes' | 'capacityBytes' | 'entryCount' | 'chosenEntry'> {
   claimed: boolean | null
-  hydrated: boolean
-  detailsLoaded: boolean
-  loadingDetails: boolean
-  owner: string | null
-  type: string | null
   filled: boolean | null
   payloadBytes: number | null
   capacityBytes: number
-  colorMode: ColorMode | null
-  role: number | null
-  claimBlock: number | null
   entryCount: number | null
   chosenEntry: number | null
-  delegate: string | null
-  machineAddress: string | null
-  chosenMachine: string | null
+  loadingDetails: boolean
 }
 
-const TOTAL_VESSELS = 10000
 const PAGE_SIZE = 50
-const VISIBLE_DETAIL_BATCH_SIZE = 8
-const FULL_DETAIL_BATCH_SIZE = 8
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/
-const DETAIL_CALLS = [
-  'craftToClaimed',
-  'craftToType',
-  'craftToPayload',
-  'craftToColorMode',
-  'craftToRole',
-  'craftToClaimBlock',
-  'craftToEntry',
-  'craftToChosenEntry',
-  'craftToDelegate',
-  'craftToMachine',
-  'craftToChosenMachine',
-] as const
 
-const wagmiConfig = useConfig()
-const allRows = ref<VesselRow[]>([])
 const databaseRows = ref<VesselRow[]>([])
 const databaseTotalRows = ref(0)
 const databaseLoading = ref(false)
-const databaseAvailable = ref(false)
 const ownershipLoading = ref(false)
 const detailsLoading = ref(false)
-const fullDetailsLoading = ref(false)
-const fullDetailsLoaded = ref(false)
 const databaseError = ref<string | null>(null)
-const ownershipError = ref<string | null>(null)
-const detailsError = ref<string | null>(null)
 
 const search = ref('')
 const claimFilter = ref<'all' | 'claimed' | 'unclaimed'>('all')
@@ -217,9 +180,7 @@ const colorFilter = ref<'all' | '0' | '1' | '2' | '3'>('all')
 const page = ref(1)
 const sortKey = ref<SortKey>('claimed')
 const sortDir = ref<'asc' | 'desc'>('desc')
-let detailsToken = 0
 let databaseToken = 0
-let detailsTimer: ReturnType<typeof setTimeout> | null = null
 
 const columns: { key: SortKey; label: string }[] = [
   { key: 'id', label: 'id' },
@@ -239,118 +200,29 @@ const columns: { key: SortKey; label: string }[] = [
   { key: 'chosenMachine', label: 'chosen machine' },
 ]
 
-const detailSortKeys = new Set<SortKey>([
-  'type',
-  'filled',
-  'payloadBytes',
-  'colorMode',
-  'role',
-  'claimBlock',
-  'entryCount',
-  'chosenEntry',
-  'delegate',
-  'machineAddress',
-  'chosenMachine',
-])
-
 const searchError = computed(() => {
   const q = search.value.trim()
   if (!q || /^\d+$/.test(q) || ADDRESS_PATTERN.test(q)) return null
   return 'search currently supports token ids and exact owner addresses'
 })
 
-const hasError = computed(() => Boolean(databaseError.value || ownershipError.value || detailsError.value || searchError.value))
-const statusMessage = computed(() => searchError.value || databaseError.value || ownershipError.value || detailsError.value)
-const queryNeedsFullDetails = computed(() => (
-  filledFilter.value !== 'all'
-  || typeFilter.value !== 'all'
-  || colorFilter.value !== 'all'
-  || detailSortKeys.has(sortKey.value)
-))
-
-const filteredRows = computed(() => {
-  const q = search.value.trim().toLowerCase()
-  let rows = allRows.value
-
-  if (q) {
-    if (/^\d+$/.test(q)) {
-      const id = Number(q)
-      rows = Number.isInteger(id) ? rows.filter(row => row.id === id) : []
-    } else if (ADDRESS_PATTERN.test(q)) {
-      rows = rows.filter(row => row.owner?.toLowerCase() === q)
-    } else {
-      rows = []
-    }
-  }
-
-  rows = rows.filter((row) => {
-    if (claimFilter.value === 'claimed' && row.claimed !== true) return false
-    if (claimFilter.value === 'unclaimed' && row.claimed !== false) return false
-    if (filledFilter.value === 'filled' && row.filled !== true) return false
-    if (filledFilter.value === 'empty' && row.filled !== false) return false
-    if (typeFilter.value !== 'all' && row.type !== typeFilter.value) return false
-    if (colorFilter.value !== 'all' && row.colorMode !== Number(colorFilter.value)) return false
-    return true
-  })
-
-  return [...rows].sort((a, b) => {
-    const result = compareValues(sortValue(a, sortKey.value), sortValue(b, sortKey.value))
-    return sortDir.value === 'asc' ? result : -result
-  })
-})
-
-const totalRows = computed(() => databaseAvailable.value ? databaseTotalRows.value : filteredRows.value.length)
-const detailsLoadedCount = computed(() => allRows.value.filter(row => row.detailsLoaded).length)
-const detailLoadLabel = computed(() => (
-  fullDetailsLoading.value
-    ? `loading traits ${detailsLoadedCount.value.toLocaleString()}/${TOTAL_VESSELS.toLocaleString()}`
-    : 'loading traits'
-))
-const visibleRows = computed(() => {
-  if (databaseAvailable.value) return databaseRows.value
-  const start = (page.value - 1) * PAGE_SIZE
-  return filteredRows.value.slice(start, start + PAGE_SIZE)
-})
-const visibleRowIds = computed(() => visibleRows.value.map(row => row.id).join(','))
+const hasError = computed(() => Boolean(databaseError.value || searchError.value))
+const statusMessage = computed(() => searchError.value || databaseError.value)
+const detailLoadLabel = computed(() => 'loading traits')
+const visibleRows = computed(() => databaseRows.value)
+const totalRows = computed(() => databaseTotalRows.value)
 const pageStart = computed(() => visibleRows.value.length === 0 ? 0 : (page.value - 1) * PAGE_SIZE + 1)
 const pageEnd = computed(() => Math.min(totalRows.value, (page.value - 1) * PAGE_SIZE + visibleRows.value.length))
 const emptyMessage = computed(() => {
   if (databaseLoading.value) return 'loading vessels...'
-  if (queryNeedsFullDetails.value && fullDetailsLoading.value) return 'loading matching vessels...'
-  if (ownershipLoading.value || detailsLoading.value) return 'loading vessels...'
   if (searchError.value) return 'invalid search'
   return 'no vessels matched'
 })
 
-function createRow(id: number): VesselRow {
-  return {
-    id,
-    claimed: null,
-    hydrated: false,
-    detailsLoaded: false,
-    loadingDetails: false,
-    owner: null,
-    type: null,
-    filled: null,
-    payloadBytes: null,
-    capacityBytes: id,
-    colorMode: null,
-    role: null,
-    claimBlock: null,
-    entryCount: null,
-    chosenEntry: null,
-    delegate: null,
-    machineAddress: null,
-    chosenMachine: null,
-  }
-}
-
-function rowFromDatabase(row: any): VesselRow {
+function rowFromIndexer(row: TokenRow): VesselRow {
   return {
     id: Number(row.id),
     claimed: typeof row.claimed === 'boolean' ? row.claimed : null,
-    hydrated: true,
-    detailsLoaded: true,
     loadingDetails: false,
     owner: row.owner || null,
     type: row.type || null,
@@ -364,28 +236,10 @@ function rowFromDatabase(row: any): VesselRow {
     chosenEntry: numberValue(row.chosenEntry),
     delegate: row.delegate || null,
     machineAddress: row.machineAddress || null,
+    isVault: row.isVault,
+    isMachine: row.isMachine,
     chosenMachine: row.chosenMachine || null,
   }
-}
-
-function sortValue(row: VesselRow, key: SortKey): string | number | boolean | null {
-  return row[key] as string | number | boolean | null
-}
-
-function compareValues(a: string | number | boolean | null, b: string | number | boolean | null) {
-  const aMissing = a === null || a === undefined || a === ''
-  const bMissing = b === null || b === undefined || b === ''
-  if (aMissing && bMissing) return 0
-  if (aMissing) return 1
-  if (bMissing) return -1
-  if (typeof a === 'boolean' || typeof b === 'boolean') return Number(a) - Number(b)
-  if (typeof a === 'number' || typeof b === 'number') return Number(a) - Number(b)
-  return String(a).localeCompare(String(b), undefined, { numeric: true })
-}
-
-function resultAt(results: any[], rowIndex: number, callIndex: number) {
-  const value = results[rowIndex * DETAIL_CALLS.length + callIndex]
-  return value?.status === 'success' ? value.result : null
 }
 
 function numberValue(value: unknown): number | null {
@@ -394,102 +248,10 @@ function numberValue(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function boolValue(value: unknown): boolean | null {
-  return typeof value === 'boolean' ? value : null
-}
-
-function addressValue(value: unknown): string | null {
-  const address = String(value || ZERO_ADDRESS)
-  return address.toLowerCase() === ZERO_ADDRESS ? null : address
-}
-
-function payloadByteLength(value: unknown): number | null {
-  if (typeof value !== 'string') return null
-  return hexToBytes(value).length
-}
-
-function applyDetailResults(batch: number[], results: any[]) {
-  for (let rowIndex = 0; rowIndex < batch.length; rowIndex++) {
-    const id = batch[rowIndex]!
-    const row = allRows.value[id - 1]
-    if (!row) continue
-
-    const claimed = boolValue(resultAt(results, rowIndex, 0))
-    const type = resultAt(results, rowIndex, 1)
-    const payloadBytes = payloadByteLength(resultAt(results, rowIndex, 2))
-    const colorMode = numberValue(resultAt(results, rowIndex, 3))
-    const role = numberValue(resultAt(results, rowIndex, 4))
-    const claimBlock = numberValue(resultAt(results, rowIndex, 5))
-    const entryCount = numberValue(resultAt(results, rowIndex, 6))
-    const chosenEntry = numberValue(resultAt(results, rowIndex, 7))
-    const delegate = addressValue(resultAt(results, rowIndex, 8))
-    const machineAddress = addressValue(resultAt(results, rowIndex, 9))
-    const chosenMachine = addressValue(resultAt(results, rowIndex, 10))
-    const loadedFieldCount = results
-      .slice(rowIndex * DETAIL_CALLS.length, (rowIndex + 1) * DETAIL_CALLS.length)
-      .filter(item => item?.status === 'success').length
-
-    row.claimed = claimed ?? row.claimed
-    row.type = typeof type === 'string' ? type.toLowerCase() : row.type
-    row.payloadBytes = payloadBytes
-    row.filled = payloadBytes == null ? null : payloadBytes > 0
-    row.colorMode = colorMode == null ? row.colorMode : colorMode as ColorMode
-    row.role = role
-    row.claimBlock = claimBlock
-    row.entryCount = entryCount
-    row.chosenEntry = chosenEntry
-    row.delegate = delegate
-    row.machineAddress = machineAddress
-    row.chosenMachine = chosenMachine
-    row.hydrated = loadedFieldCount > 0
-    row.detailsLoaded = true
-    row.loadingDetails = false
-  }
-}
-
-async function readDetailBatch(batch: number[]) {
-  const contracts = batch.flatMap(id =>
-    DETAIL_CALLS.map(functionName => ({
-      address: VESSEL_ADDRESS,
-      abi: VESSEL_ABI,
-      functionName,
-      args: [BigInt(id)],
-    })),
-  )
-
-  return readContracts(wagmiConfig, {
-    contracts: contracts as any,
-    allowFailure: true,
-  }) as Promise<any[]>
-}
-
-async function loadOwnership() {
-  ownershipLoading.value = true
-  ownershipError.value = null
-
-  try {
-    const { ownership } = await fetchOwnership()
-    allRows.value = allRows.value.map((row) => {
-      const owner = ownership.get(String(row.id)) || null
-      return {
-        ...row,
-        claimed: Boolean(owner),
-        owner,
-      }
-    })
-  } catch (e: any) {
-    ownershipError.value = e?.data?.message || e?.message || 'ownership transfer replay unavailable'
-  } finally {
-    ownershipLoading.value = false
-  }
-}
-
-async function loadDatabaseRows(initial = false) {
+async function loadDatabaseRows() {
   if (searchError.value) {
-    if (databaseAvailable.value) {
-      databaseRows.value = []
-      databaseTotalRows.value = 0
-    }
+    databaseRows.value = []
+    databaseTotalRows.value = 0
     return false
   }
 
@@ -497,188 +259,36 @@ async function loadDatabaseRows(initial = false) {
   databaseLoading.value = true
   databaseError.value = null
 
-  const params = new URLSearchParams({
-    page: String(page.value),
-    pageSize: String(PAGE_SIZE),
-    search: search.value.trim(),
-    claim: claimFilter.value,
-    filled: filledFilter.value,
-    type: typeFilter.value,
-    color: colorFilter.value,
-    sort: sortKey.value,
-    dir: sortDir.value,
-  })
-
   try {
-    const res = await fetch(`/api/tokens?${params.toString()}`)
-    if (!res.ok) {
-      const body = await res.json().catch(() => null)
-      throw new Error(body?.message || body?.statusMessage || 'database token index unavailable')
-    }
-
-    const data = await res.json()
+    const data = await fetchTokenPage({
+      page: String(page.value),
+      pageSize: String(PAGE_SIZE),
+      search: search.value.trim(),
+      claim: claimFilter.value,
+      filled: filledFilter.value,
+      type: typeFilter.value,
+      color: colorFilter.value,
+      sort: sortKey.value,
+      dir: sortDir.value,
+    })
     if (token !== databaseToken) return true
 
-    databaseRows.value = Array.isArray(data.rows) ? data.rows.map(rowFromDatabase) : []
+    databaseRows.value = Array.isArray(data.rows) ? data.rows.map(rowFromIndexer) : []
     databaseTotalRows.value = Number(data.total || 0)
-    databaseAvailable.value = true
     return true
   } catch (e: any) {
-    if (initial) {
-      databaseAvailable.value = false
-      databaseRows.value = []
-      databaseTotalRows.value = 0
-      return false
-    }
-
-    databaseError.value = e?.message || 'database token index unavailable'
+    databaseRows.value = []
+    databaseTotalRows.value = 0
+    databaseError.value = e?.data?.message || e?.message || 'indexer token index unavailable'
     return false
   } finally {
     if (token === databaseToken) databaseLoading.value = false
   }
 }
 
-function scheduleDetailsLoad() {
-  if (databaseAvailable.value) return
-  if (detailsTimer) clearTimeout(detailsTimer)
-  detailsTimer = setTimeout(() => {
-    if (queryNeedsFullDetails.value) {
-      void loadAllDetails()
-    } else {
-      void loadVisibleDetails()
-    }
-  }, 80)
-}
-
-async function loadVisibleDetails() {
-  if (fullDetailsLoading.value) return
-
-  const token = ++detailsToken
-  const ids = visibleRows.value
-    .filter(row => !row.detailsLoaded && !row.loadingDetails)
-    .map(row => row.id)
-
-  if (ids.length === 0) return
-
-  detailsLoading.value = true
-  detailsError.value = null
-
-  try {
-    for (let i = 0; i < ids.length && token === detailsToken; i += VISIBLE_DETAIL_BATCH_SIZE) {
-      const batch = ids.slice(i, i + VISIBLE_DETAIL_BATCH_SIZE)
-      for (const id of batch) {
-        const row = allRows.value[id - 1]
-        if (row) row.loadingDetails = true
-      }
-
-      try {
-        const results = await readDetailBatch(batch)
-
-        if (token !== detailsToken) {
-          for (const id of batch) {
-            const row = allRows.value[id - 1]
-            if (row) row.loadingDetails = false
-          }
-          return
-        }
-
-        applyDetailResults(batch, results)
-      } catch (e: any) {
-        if (token === detailsToken) {
-          detailsError.value = e?.shortMessage || e?.message || 'trait reads unavailable'
-        }
-        for (const id of batch) {
-          const row = allRows.value[id - 1]
-          if (row) row.loadingDetails = false
-        }
-      }
-    }
-  } finally {
-    if (token === detailsToken) detailsLoading.value = false
-  }
-}
-
-async function loadAllDetails() {
-  if (fullDetailsLoading.value || fullDetailsLoaded.value) return
-
-  const token = ++detailsToken
-  fullDetailsLoading.value = true
-  detailsLoading.value = true
-  detailsError.value = null
-
-  try {
-    const ids = allRows.value
-      .filter(row => !row.detailsLoaded)
-      .map(row => row.id)
-
-    for (let i = 0; i < ids.length && token === detailsToken; i += FULL_DETAIL_BATCH_SIZE) {
-      const batch = ids.slice(i, i + FULL_DETAIL_BATCH_SIZE)
-      const pendingBatch = batch.filter((id) => {
-        const row = allRows.value[id - 1]
-        return row && !row.detailsLoaded
-      })
-
-      if (pendingBatch.length === 0) continue
-
-      for (const id of pendingBatch) {
-        const row = allRows.value[id - 1]
-        if (row) row.loadingDetails = true
-      }
-
-      try {
-        const results = await readDetailBatch(pendingBatch)
-
-        if (token !== detailsToken) {
-          for (const id of pendingBatch) {
-            const row = allRows.value[id - 1]
-            if (row) row.loadingDetails = false
-          }
-          return
-        }
-
-        applyDetailResults(pendingBatch, results)
-      } catch (e: any) {
-        if (token === detailsToken) {
-          detailsError.value = e?.shortMessage || e?.message || 'trait reads unavailable'
-        }
-        for (const id of pendingBatch) {
-          const row = allRows.value[id - 1]
-          if (row) row.loadingDetails = false
-        }
-      }
-    }
-  } finally {
-    if (token === detailsToken) {
-      fullDetailsLoaded.value = allRows.value.length > 0 && allRows.value.every(row => row.detailsLoaded)
-      fullDetailsLoading.value = false
-      detailsLoading.value = false
-    }
-  }
-}
-
-function resetDetailState() {
-  detailsToken++
-  fullDetailsLoading.value = false
-  fullDetailsLoaded.value = false
-  detailsLoading.value = false
-  for (const row of allRows.value) {
-    row.loadingDetails = false
-  }
-}
-
 async function reload() {
-  if (databaseAvailable.value) {
-    databaseError.value = null
-    await loadDatabaseRows()
-    return
-  }
-
-  ownershipError.value = null
-  detailsError.value = null
-  resetDetailState()
-  allRows.value = Array.from({ length: TOTAL_VESSELS }, (_, index) => createRow(index + 1))
-  await loadOwnership()
-  scheduleDetailsLoad()
+  databaseError.value = null
+  await loadDatabaseRows()
 }
 
 function toggleSort(key: SortKey) {
@@ -716,17 +326,12 @@ function typeClass(type: string | null) {
 }
 
 function colorLabel(row: VesselRow) {
-  return row.colorMode == null ? '-' : colorModeName(row.colorMode)
+  return row.colorMode == null ? '-' : colorModeName(row.colorMode as ColorMode)
 }
 
 function filledLabel(row: VesselRow) {
   if (row.filled == null) return '-'
   return row.filled ? 'filled' : 'not filled'
-}
-
-function boolLabel(value: boolean | null) {
-  if (value == null) return '-'
-  return value ? 'yes' : 'no'
 }
 
 function claimLabel(row: VesselRow) {
@@ -741,42 +346,20 @@ function formatNullable(value: number | null) {
 watch(
   [search, claimFilter, filledFilter, typeFilter, colorFilter, sortKey, sortDir],
   () => {
-    if (page.value !== 1) page.value = 1
+    if (page.value !== 1) {
+      page.value = 1
+    } else {
+      void loadDatabaseRows()
+    }
   },
 )
 
-watch(visibleRowIds, () => {
-  if (databaseAvailable.value) return
-  scheduleDetailsLoad()
+watch(page, () => {
+  void loadDatabaseRows()
 })
-
-watch(queryNeedsFullDetails, (needsFullDetails) => {
-  if (!databaseAvailable.value && needsFullDetails) void loadAllDetails()
-})
-
-watch(
-  [page, search, claimFilter, filledFilter, typeFilter, colorFilter, sortKey, sortDir],
-  () => {
-    if (databaseAvailable.value) void loadDatabaseRows()
-  },
-)
-
-async function loadInitialRows() {
-  allRows.value = Array.from({ length: TOTAL_VESSELS }, (_, index) => createRow(index + 1))
-
-  if (await loadDatabaseRows(true)) return
-
-  void loadOwnership()
-  scheduleDetailsLoad()
-}
 
 onMounted(() => {
-  void loadInitialRows()
-})
-
-onUnmounted(() => {
-  if (detailsTimer) clearTimeout(detailsTimer)
-  detailsToken++
+  void loadDatabaseRows()
 })
 
 useHead({ title: 'all vessel tokens' })

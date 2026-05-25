@@ -63,13 +63,10 @@
 </template>
 
 <script setup lang="ts">
-import { readContract } from '@wagmi/core'
-import { useConfig } from '@wagmi/vue'
 import type { ComponentPublicInstance } from 'vue'
-import { VESSEL_ADDRESS, VESSEL_ABI, byteToRGB, getGridDimensions, hexToBytes, renderToCanvas, type ColorMode } from '~/utils/vessel'
-import { fetchOwnership } from '~/composables/useOwnership'
+import { byteToRGB, getGridDimensions, renderToCanvas, type ColorMode } from '~/utils/vessel'
+import { bytesFromHex, fetchAllTokenRows, fetchTokensByIds } from '~/utils/indexer'
 
-const wagmiConfig = useConfig()
 const router = useRouter()
 
 const totalVessels = 10000
@@ -244,89 +241,39 @@ async function loadVisible() {
   const ids = prioritizedIds.value
   if (!shouldLoadDetailedCells.value) return
 
-  const claimedIds = ids.filter(id => claimedSet.value.has(id) && !payloadCache.has(id))
-
-  const missingTypes = ids.filter(id => !typeCache.has(id))
-  for (let i = 0; i < missingTypes.length && token === currentToken; i += 30) {
-    const batch = missingTypes.slice(i, i + 30)
-    const results = await Promise.all(
-      batch.map(id =>
-        readContract(wagmiConfig, {
-          address: VESSEL_ADDRESS,
-          abi: VESSEL_ABI,
-          functionName: 'craftToType',
-          args: [BigInt(id)],
-        }).catch(() => 'Capsule') as Promise<string>
-      )
-    )
+  const missingIds = ids.filter(id => !typeCache.has(id) || (claimedSet.value.has(id) && !payloadCache.has(id)))
+  for (let i = 0; i < missingIds.length && token === currentToken; i += 100) {
+    const batch = missingIds.slice(i, i + 100)
+    const rows = await fetchTokensByIds(batch, true)
     if (token !== currentToken) return
-    for (let j = 0; j < batch.length; j++) {
-      typeCache.set(batch[j]!, results[j]!)
-    }
-  }
 
-  // Load payloads + colorModes — each renders individually as it arrives
-  const missingPayloadIds = claimedIds.filter(id => !payloadCache.has(id))
-  for (let i = 0; i < missingPayloadIds.length && token === currentToken; i += 10) {
-    const batch = missingPayloadIds.slice(i, i + 10)
-    await Promise.all(
-      batch.map(async (id) => {
-        if (token !== currentToken) return
-        try {
-          const [raw, cm] = await Promise.all([
-            readContract(wagmiConfig, {
-              address: VESSEL_ADDRESS,
-              abi: VESSEL_ABI,
-              functionName: 'craftToPayload',
-              args: [BigInt(id)],
-            }) as Promise<string>,
-            readContract(wagmiConfig, {
-              address: VESSEL_ADDRESS,
-              abi: VESSEL_ABI,
-              functionName: 'craftToColorMode',
-              args: [BigInt(id)],
-            }).catch(() => 0) as Promise<number>,
-          ])
-          colorModeCache.set(id, cm as ColorMode)
-          const bytes = hexToBytes(raw)
-          if (bytes.length > 0) payloadCache.set(id, bytes)
-        } catch { /* skip */ }
-      })
-    )
+    for (const row of rows) {
+      const id = Number(row.id)
+      if (row.type) typeCache.set(id, row.type)
+      colorModeCache.set(id, Number(row.colorMode || 0) as ColorMode)
+      if (row.claimed) claimedSet.value.add(id)
+      const bytes = bytesFromHex(row.payloadHex)
+      if (bytes.length > 0) payloadCache.set(id, bytes)
+    }
   }
 }
 
 let allClaimedToken = 0
 
 async function loadClaimedBatch(ids: number[], token: number) {
-  for (let i = 0; i < ids.length && token === allClaimedToken; i += 10) {
-    const batch = ids.slice(i, i + 10).filter(id => !payloadCache.has(id))
+  for (let i = 0; i < ids.length && token === allClaimedToken; i += 100) {
+    const batch = ids.slice(i, i + 100).filter(id => !payloadCache.has(id))
     if (!batch.length) continue
 
-    await Promise.all(
-      batch.map(async (id) => {
-        if (token !== allClaimedToken) return
-        try {
-          const [raw, cm] = await Promise.all([
-            readContract(wagmiConfig, {
-              address: VESSEL_ADDRESS,
-              abi: VESSEL_ABI,
-              functionName: 'craftToPayload',
-              args: [BigInt(id)],
-            }) as Promise<string>,
-            readContract(wagmiConfig, {
-              address: VESSEL_ADDRESS,
-              abi: VESSEL_ABI,
-              functionName: 'craftToColorMode',
-              args: [BigInt(id)],
-            }).catch(() => 0) as Promise<number>,
-          ])
-          colorModeCache.set(id, cm as ColorMode)
-          const bytes = hexToBytes(raw)
-          if (bytes.length > 0) payloadCache.set(id, bytes)
-        } catch { /* skip */ }
-      })
-    )
+    const rows = await fetchTokensByIds(batch, true)
+    if (token !== allClaimedToken) return
+    for (const row of rows) {
+      const id = Number(row.id)
+      if (row.type) typeCache.set(id, row.type)
+      colorModeCache.set(id, Number(row.colorMode || 0) as ColorMode)
+      const bytes = bytesFromHex(row.payloadHex)
+      if (bytes.length > 0) payloadCache.set(id, bytes)
+    }
   }
 }
 
@@ -698,9 +645,17 @@ onMounted(async () => {
 
   // Load claimed set then start loading
   try {
-    const { ownership } = await fetchOwnership()
+    const claimedRows = await fetchAllTokenRows({
+      claim: 'claimed',
+      sort: 'id',
+      dir: 'asc',
+      pageSize: 250,
+    })
     const set = new Set<number>()
-    for (const id of ownership.keys()) set.add(Number(id))
+    for (const row of claimedRows) {
+      set.add(Number(row.id))
+      if (row.type) typeCache.set(Number(row.id), row.type)
+    }
     claimedSet.value = set
     allClaimedPayloadsLoaded.value = false
     if (viewAllMode.value) {
