@@ -152,6 +152,28 @@ Normalized activity feed. Supports:
 - `tokenId` or `id`
 - `address`: matches actor, from, to, delegate, or machine address
 
+### `GET /activity/daily`
+
+Daily activity aggregate used by the homepage heatmap. It returns every UTC day
+from the first indexed contract interaction through today, filling quiet days
+with `count: 0`.
+
+Supports the same filter params as `/activity`: `type`, `tokenId` or `id`, and
+`address`.
+
+Response shape:
+
+```json
+{
+  "startDate": "2026-02-24",
+  "endDate": "2026-05-25",
+  "total": 1927,
+  "maxCount": 500,
+  "days": [{ "date": "2026-02-24", "count": 12 }],
+  "source": "ponder"
+}
+```
+
 ### `GET /transfers`
 
 Transfer history. Supports:

@@ -250,6 +250,56 @@ app.get('/activity', async (c) => {
   return c.json(normalizeRows(result).map(activityToExplorerTx))
 })
 
+app.get('/activity/daily', async (c) => {
+  const conds = activityFilters(c)
+  const whereClause = andClause(conds)
+
+  const [rangeResult, countResult] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        MIN(timestamp) AS "firstTimestamp",
+        MAX(timestamp) AS "lastTimestamp",
+        COUNT(*)::integer AS total
+      FROM ${activityEvent}
+      WHERE ${whereClause}
+    `),
+    db.execute(sql`
+      SELECT
+        to_char(to_timestamp(timestamp::double precision) AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+        COUNT(*)::integer AS count
+      FROM ${activityEvent}
+      WHERE ${whereClause}
+      GROUP BY date
+      ORDER BY date ASC
+    `),
+  ])
+
+  const range = normalizeRows(rangeResult)[0] ?? {}
+  const total = Number(range.total ?? 0)
+  const today = utcDateKey(new Date())
+  const startDate = total > 0 ? utcDateKeyFromSeconds(range.firstTimestamp) : today
+  const endDate = today
+  const counts = new Map(
+    normalizeRows(countResult).map((row) => [
+      String(row.date),
+      Number(row.count ?? 0),
+    ]),
+  )
+  const days = dailyRange(startDate, endDate).map((date) => ({
+    date,
+    count: counts.get(date) ?? 0,
+  }))
+
+  return c.json({
+    startDate,
+    endDate,
+    total,
+    maxCount: Math.max(0, ...days.map((day) => day.count)),
+    days,
+    source: 'ponder',
+  })
+})
+
 app.get('/transfers', async (c) => {
   const page = Math.max(1, Number(c.req.query('page')) || 1)
   const limit = Math.min(
@@ -555,4 +605,31 @@ function detailForActivity(action: string, tokenId: string | null, row: Row) {
 
 function stringify(value: unknown) {
   return value == null ? '' : value.toString()
+}
+
+function utcDateKey(date: Date) {
+  return date.toISOString().slice(0, 10)
+}
+
+function utcDateKeyFromSeconds(value: unknown) {
+  const seconds = Number(value)
+  if (!Number.isFinite(seconds) || seconds <= 0) return utcDateKey(new Date())
+  return utcDateKey(new Date(seconds * 1000))
+}
+
+function utcDateKeyToTime(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  return Date.UTC(year || 1970, (month || 1) - 1, day || 1)
+}
+
+function dailyRange(startDate: string, endDate: string) {
+  const start = utcDateKeyToTime(startDate)
+  const end = utcDateKeyToTime(endDate)
+  if (start > end) return [endDate]
+
+  const days: string[] = []
+  for (let time = start; time <= end; time += 86_400_000) {
+    days.push(utcDateKey(new Date(time)))
+  }
+  return days
 }
