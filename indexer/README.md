@@ -126,7 +126,9 @@ metadata, timestamps, and machine/vault flags.
 
 ### `GET /tokens/:id/entries`
 
-Vault/capsule entry snapshots ordered by `entryIndex`.
+Indexed entry snapshots ordered by `entryIndex`. Vault detail pages use this
+to render historical entries; capsule current payloads are available on
+`/tokens/:id`.
 
 ### `GET /tokens/:id/writes`
 
@@ -142,20 +144,35 @@ Query params:
 
 ### `GET /activity`
 
-Normalized activity feed. Supports filters for `type`, `tokenId`, `actor`, and
-`address`.
+Normalized activity feed. Supports:
+
+- `page`
+- `limit` or `offset`
+- `type`
+- `tokenId` or `id`
+- `address`: matches actor, from, to, delegate, or machine address
 
 ### `GET /transfers`
 
-Transfer history. Supports `tokenId`, `from`, `to`, and `address`.
+Transfer history. Supports:
+
+- `page`
+- `limit` or `offset`
+- `address`: matches either transfer side
 
 ### `GET /holders`
 
 Current holder leaderboard derived from indexed token ownership.
 
+Query params:
+
+- `limit`: capped at `5000`
+
 ### `GET /stats`
 
-Indexer summary counts and activity type counts.
+Indexer summary counts and activity type counts. Token stats include total,
+claimed, filled, machines, vaults, capsules, claimed capacity bytes, filled
+bytes, and unique holders.
 
 ## Built-In Endpoints
 
@@ -166,7 +183,7 @@ Ponder exposes:
 - GraphQL at `/graphql`
 - SQL at `/sql/*`
 
-Kamal proxy cutover uses `/ready`.
+Kamal proxy cutover uses `/health`.
 
 ## Production Deployment
 
@@ -187,10 +204,11 @@ mounts persistent database storage at:
 ```
 
 `../Dockerfile.indexer` runs `pnpm codegen` during the image build. The runtime
-starts Ponder with a fresh deploy schema and a stable views schema:
+starts Ponder with a fresh deploy schema derived from `KAMAL_VERSION` and a
+stable views schema:
 
 ```bash
-pnpm ponder --schema=vessel_$(git rev) --views-schema=vessel
+pnpm start --schema=vessel_<deploy-hash> --views-schema=vessel
 ```
 
 This keeps old failed deploy schemas isolated while exposing stable views for
@@ -210,6 +228,7 @@ Required in production:
 
 Optional:
 
+- `DATABASE_SCHEMA`
 - `PONDER_RPC_FALLBACK_URLS_1`
 - `PONDER_WS_URL_1`
 - `PONDER_RPC_REQUESTS_PER_SECOND_1`
