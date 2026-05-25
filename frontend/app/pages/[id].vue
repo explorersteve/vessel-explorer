@@ -208,15 +208,27 @@
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    class="write-hex"
-                    :title="write.payloadHex"
-                    @click="copyWriteBytes(write)"
-                  >
-                    <span class="write-hex-label">bytes</span>
-                    <code>{{ compactHex(write.payloadHex) }}</code>
-                  </button>
+                  <div class="write-payload-grid">
+                    <div class="write-preview-frame" aria-hidden="true">
+                      <ClientOnly>
+                        <WritePayloadPreview
+                          :payload-hex="write.payloadHex"
+                          :token-id="vessel.id"
+                          :color-mode="vessel.colorMode"
+                        />
+                      </ClientOnly>
+                    </div>
+
+                    <button
+                      type="button"
+                      class="write-hex"
+                      :title="write.payloadHex"
+                      @click="copyWriteBytes(write)"
+                    >
+                      <span class="write-hex-label">bytes</span>
+                      <code>{{ compactHex(write.payloadHex) }}</code>
+                    </button>
+                  </div>
                 </div>
               </article>
             </div>
@@ -788,16 +800,23 @@ function shortHash(hash: string) {
 
 .copy-write-btn {
   justify-self: end;
-  height: 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  block-size: 1.35rem;
+  min-inline-size: 4.35rem;
   padding: 0 0.35rem;
   background: var(--bg-subtle);
   border: 1px solid var(--border-color);
+  border-radius: 0;
   box-shadow: none;
+  box-sizing: border-box;
   color: var(--text-faint);
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1;
+  text-align: center;
   text-transform: uppercase;
 
   &:hover {
@@ -829,16 +848,40 @@ function shortHash(hash: string) {
   }
 }
 
+.write-payload-grid {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.65rem;
+  margin-top: 0.6rem;
+}
+
+.write-preview-frame {
+  display: grid;
+  place-items: center;
+  min-block-size: 4.75rem;
+  min-inline-size: 0;
+  padding: 0.35rem;
+  border: 1px solid var(--border-color);
+  background: var(--background);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
 .write-hex {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: baseline;
-  gap: 0.55rem;
-  width: 100%;
-  margin-top: 0.5rem;
-  padding: 0.4rem 0.5rem;
+  grid-template-columns: 1fr;
+  align-content: center;
+  gap: 0.25rem;
+  inline-size: 100%;
+  block-size: auto;
+  min-block-size: 4.75rem;
+  min-inline-size: 0;
+  padding: 0.45rem 0.55rem;
   border: 1px solid var(--border-color);
+  border-radius: 0;
   background: var(--bg-subtle);
+  box-shadow: none;
   box-sizing: border-box;
   color: var(--text-faint);
   cursor: copy;
@@ -846,6 +889,7 @@ function shortHash(hash: string) {
   font-size: 12px;
   line-height: 1.35;
   text-align: left;
+  user-select: text;
 
   &:hover {
     border-color: var(--muted);
@@ -953,9 +997,14 @@ function shortHash(hash: string) {
     grid-column: 1 / -1;
   }
 
+  .write-payload-grid {
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+    gap: 0.45rem;
+  }
+
+  .write-preview-frame,
   .write-hex {
-    grid-template-columns: 1fr;
-    gap: 0.15rem;
+    min-block-size: 4.25rem;
   }
 }
 </style>
