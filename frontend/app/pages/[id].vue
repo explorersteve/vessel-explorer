@@ -179,13 +179,6 @@
                       entry {{ write.entryIndex }}
                     </span>
                     <span class="history-time">{{ formatWriteTime(write.timestamp) }}</span>
-                    <button
-                      type="button"
-                      class="copy-write-btn"
-                      @click="copyWriteBytes(write)"
-                    >
-                      {{ copiedWriteId === write.id ? '[copied]' : '[copy]' }}
-                    </button>
                   </div>
 
                   <div class="history-meta-grid">
@@ -340,7 +333,6 @@ const writesError = ref('')
 const writeRows = ref<PayloadWrite[]>([])
 const writeTotal = ref(0)
 const writesPage = ref(1)
-const copiedWriteId = ref<string | null>(null)
 let writesRequestId = 0
 const machineEventsLoading = ref(false)
 const machineEventsError = ref('')
@@ -428,10 +420,6 @@ async function copyBytes() {
 
 async function copyWriteBytes(write: PayloadWrite) {
   await navigator.clipboard.writeText(write.payloadHex)
-  copiedWriteId.value = write.id
-  setTimeout(() => {
-    if (copiedWriteId.value === write.id) copiedWriteId.value = null
-  }, 2000)
 }
 
 function clearHistory() {
@@ -740,7 +728,7 @@ function shortHash(hash: string) {
 
 .history-topline {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: baseline;
   gap: 0.75rem;
   min-width: 0;
@@ -767,6 +755,11 @@ function shortHash(hash: string) {
 .history-time {
   color: var(--muted);
   white-space: nowrap;
+}
+
+.history-time {
+  grid-column: 3;
+  justify-self: end;
 }
 
 .write-entry {
@@ -796,33 +789,6 @@ function shortHash(hash: string) {
   text-transform: uppercase;
   font-size: 10px;
   letter-spacing: 0;
-}
-
-.copy-write-btn {
-  justify-self: end;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  block-size: 1.35rem;
-  min-inline-size: 4.35rem;
-  padding: 0 0.35rem;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-color);
-  border-radius: 0;
-  box-shadow: none;
-  box-sizing: border-box;
-  color: var(--text-faint);
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1;
-  text-align: center;
-  text-transform: uppercase;
-
-  &:hover {
-    border-color: var(--muted);
-    color: var(--color);
-  }
 }
 
 .explorer-link {
@@ -982,8 +948,7 @@ function shortHash(hash: string) {
     grid-column: 1;
   }
 
-  .history-time,
-  .copy-write-btn {
+  .history-time {
     grid-column: 2;
     justify-self: end;
   }
