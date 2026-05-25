@@ -9,6 +9,17 @@ export default defineEventHandler(async (event) => {
   const offset = Math.min(Number.isFinite(rawOffset) ? rawOffset : 1000, 10000)
 
   const config = useRuntimeConfig()
+  const indexerUrl = String(config.indexerUrl || process.env.NUXT_INDEXER_URL || '').replace(/\/$/, '')
+  if (indexerUrl) {
+    const params = new URLSearchParams({
+      page: String(page),
+      offset: String(offset),
+    })
+    if (address) params.set('address', address)
+    const response = await fetch(`${indexerUrl}/transfers?${params.toString()}`).catch(() => null)
+    if (response?.ok) return await response.json()
+  }
+
   const apiKey = config.etherscanKey as string
   if (!apiKey) {
     throw createError({
