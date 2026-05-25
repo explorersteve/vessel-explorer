@@ -53,6 +53,11 @@ test('heatmap renders useful contrast without the old date range caption', async
   expect(heatmap.hasDateRangeArrow).toBe(false)
   expect(heatmap.uniqueBackgrounds).toBeGreaterThanOrEqual(6)
   expect(heatmap.overflow).toBe(false)
+
+  await page.locator('.heatmap-day').first().hover()
+  await expect(page.locator('.heatmap-tooltip')).toBeVisible()
+  await expect(page.locator('.heatmap-tooltip-date')).toContainText(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/)
+  await expect(page.locator('.heatmap-tooltip-count')).toContainText(/interaction/)
 })
 
 test('vessel write rows keep click-to-copy and aligned dates', async ({ page }) => {

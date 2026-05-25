@@ -39,14 +39,28 @@
               class="heatmap-empty"
               aria-hidden="true"
             />
-            <span
+            <Tooltip
               v-for="(day, index) in days"
               :key="day.date"
-              :class="['heatmap-day', `level-${levelFor(day.count)}`, { deployment: index === 0 }]"
-              :title="dayTitle(day, index)"
-              :aria-label="dayTitle(day, index)"
-              tabindex="0"
-            />
+              side="top"
+              align="center"
+              :side-offset="8"
+              :delay-duration="80"
+              :arrow="false"
+            >
+              <template #trigger>
+                <span
+                  :class="['heatmap-day', `level-${levelFor(day.count)}`, { deployment: index === 0 }]"
+                  :aria-label="dayTitle(day, index)"
+                  tabindex="0"
+                />
+              </template>
+              <div class="heatmap-tooltip">
+                <span class="heatmap-tooltip-date">{{ formatDate(day.date) }}</span>
+                <span class="heatmap-tooltip-count">{{ interactionLabel(day.count) }}</span>
+                <span v-if="index === 0" class="heatmap-tooltip-note">contract deployed</span>
+              </div>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -126,10 +140,14 @@ function levelFor(count: number) {
 }
 
 function dayTitle(day: DailyActivityDay, index: number) {
-  const count = `${day.count.toLocaleString()} ${day.count === 1 ? 'interaction' : 'interactions'}`
+  const count = interactionLabel(day.count)
   return index === 0
     ? `${formatDate(day.date)}: contract deployed, ${count}`
     : `${formatDate(day.date)}: ${count}`
+}
+
+function interactionLabel(count: number) {
+  return `${count.toLocaleString()} ${count === 1 ? 'interaction' : 'interactions'}`
 }
 
 function utcWeekday(dateKey: string) {
@@ -269,6 +287,28 @@ function formatDate(dateKey: string) {
 .heatmap-day:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: 2px;
+}
+
+.heatmap-tooltip {
+  display: grid;
+  gap: 0.18rem;
+  min-inline-size: 8.5rem;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.heatmap-tooltip-date {
+  color: var(--color);
+  font-weight: 600;
+}
+
+.heatmap-tooltip-count {
+  color: var(--muted);
+}
+
+.heatmap-tooltip-note {
+  color: var(--text-faint);
+  font-size: 10px;
 }
 
 @media (max-width: 640px) {
