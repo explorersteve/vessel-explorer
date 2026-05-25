@@ -37,7 +37,6 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // Server-only (not shipped to browser)
     etherscanKey: '',
-    databaseUrl: '',
     indexerUrl: '',
     public: {
       evm: {

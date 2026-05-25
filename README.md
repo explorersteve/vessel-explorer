@@ -28,11 +28,8 @@ pnpm dev
 
 Edit `.env` before starting the frontend if needed:
 
-- `NUXT_ETHERSCAN_KEY` is required for the activity feed, holder data, and
-  `/all` ownership when the Ponder indexer is not configured.
+- `NUXT_ETHERSCAN_KEY` enables Etherscan fallback activity and transfer routes.
 - `NUXT_INDEXER_URL` points the frontend server routes at the Ponder indexer.
-- `DATABASE_URL` enables the legacy Postgres read model for fast `/all`
-  filtering when the Ponder indexer is not configured.
 - `NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPC1/2/3` are the browser RPC fallbacks.
 
 ### Ponder Indexer
@@ -59,35 +56,6 @@ NUXT_INDEXER_URL=http://127.0.0.1:42069 pnpm dev
 For bounded local smoke tests, set `VESSEL_INDEXER_START_BLOCK` and
 `VESSEL_INDEXER_END_BLOCK`. Do not set those for a production full sync.
 
-### Legacy Database Read Model
-
-The app can still run without Ponder. When `NUXT_INDEXER_URL` and
-`DATABASE_URL` are missing, `/all` falls back to browser/RPC hydration. The
-legacy read model remains available:
-
-```bash
-cd vessel-explorer/frontend
-pnpm db:schema
-pnpm db:backfill
-```
-
-`pnpm db:backfill` reads all 10,000 token rows from Ethereum RPC and upserts
-their owner, type, raw payload bytes, payload size, color mode, role, delegate,
-machine, and entry metadata into Postgres. Use `ETH_RPC_URL` to point the
-indexer at a specific server-side RPC endpoint; otherwise it uses
-`NUXT_PUBLIC_EVM_CHAINS_MAINNET_RPC1` or the public fallback.
-
-After the first backfill, `pnpm db:sync` indexes only missing token rows. For
-targeted refreshes, run:
-
-```bash
-node scripts/index-vessels.mjs --tokens=1,2,3
-```
-
-If you already had a read model before `payload_data` existed, run
-`pnpm db:payloads` after `pnpm db:schema` to fill payload bytes for rows whose
-payload size is already known.
-
 ## Project Structure
 
 ```
@@ -95,7 +63,7 @@ frontend/
   app/
     pages/
       index.vue              # activity feed, holders leaderboard, search
-      all.vue                # Ponder-backed all-vessels table with fallbacks
+      all.vue                # Ponder-backed all-vessels table
       [id].vue               # vessel detail (pixel grid, metadata, content view)
       address/[addr].vue     # address profile (owned vessels grid)
     components/
@@ -114,14 +82,9 @@ frontend/
       content.ts              # content type detection (SVG, HTML, text, bytecode, binary)
   server/api/
     activity.get.ts           # Ponder activity API with Etherscan fallback
-    tokens.get.ts             # Ponder token API with Postgres/RPC fallback
+    tokens.get.ts             # Ponder token API proxy
     transfers.get.ts          # Ponder transfer API with Etherscan fallback
     og/[id].get.ts            # dynamic OG image: grayscale BMP from on-chain payload
-  db/
-    001_init.sql              # Postgres read-model schema
-  scripts/
-    db-schema.mjs             # applies schema
-    index-vessels.mjs         # legacy RPC -> Postgres token indexer
 indexer/
   ponder.config.ts            # mainnet chain, RPC load balancing, start/end override
   ponder.schema.ts            # protocol, token, entry, payload, transfer, activity tables
@@ -133,7 +96,7 @@ indexer/
 ## Pages
 
 - **`/`** — live activity feed (claims, writes, transfers, delegates, machines), holders leaderboard, search by vessel ID or address/ENS
-- **`/all`** — table of all vessel token IDs with Ponder-backed filtering/sorting, legacy database fallback, and RPC fallback
+- **`/all`** — table of all vessel token IDs with Ponder-backed filtering/sorting
 - **`/[id]`** — vessel detail with pixel grid, metadata (type, capacity, color mode, claim block), entry navigation for vaults, content detection (renders SVG/HTML, shows bytecode hex dumps), [bytes] toggle, [copy] button
 - **`/address/[addr]`** — profile page with owned vessels grid, type stats (machines/vaults/capsules/empty), progressive payload loading
 
