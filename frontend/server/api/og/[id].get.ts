@@ -6,7 +6,7 @@ const VESSEL_ADDRESS = '0xECb92Cc7112b80A2234936315BbB493fb48d1463' as const
 
 const client = createPublicClient({
   chain: mainnet,
-  transport: http('https://eth.llamarpc.com'),
+  transport: http('https://ethereum-rpc.publicnode.com'),
 })
 
 const craftToPayloadAbi = [{
