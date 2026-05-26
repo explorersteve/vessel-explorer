@@ -1,6 +1,6 @@
 # Vessel Ponder Indexer
 
-Production Ponder indexer for THE_VESSEL on Ethereum mainnet.
+Ponder indexer for THE_VESSEL on Ethereum mainnet.
 
 The indexer is the canonical data source for the explorer. It backfills the
 contract from deployment block `24524524`, seeds all 10,000 vessels, stores the
@@ -210,6 +210,9 @@ Kamal proxy cutover uses `/health`.
 ## Production Deployment
 
 Production deployment is configured with Kamal in `config/deploy.yml`.
+The repository only includes example environment files; keep the real
+`.env.production` local/ignored or inject the same variables from a secret
+manager.
 
 ```bash
 cd indexer
@@ -236,6 +239,18 @@ pnpm start --schema=vessel_<deploy-hash> --views-schema=vessel
 This keeps old failed deploy schemas isolated while exposing stable views for
 the running application.
 
+### Current Deployed Indexer
+
+The indexer is currently deployed at:
+
+```txt
+https://indexer.vessel.worldcomputer.art
+https://indexer.thevessel.fun
+```
+
+Set the primary host as `INDEXER_HOST`. Additional hostnames served by the same
+deployment belong in `INDEXER_ADDITIONAL_HOSTS`.
+
 ## Environment Variables
 
 Required in production:
@@ -253,6 +268,7 @@ Optional:
 - `INDEXER_ADDITIONAL_HOSTS` comma-separated proxy aliases, for example
   `indexer.thevessel.fun`
 - `DATABASE_SCHEMA`
+- `PONDER_VIEWS_SCHEMA`
 - `PONDER_RPC_FALLBACK_URLS_1`
 - `PONDER_WS_URL_1`
 - `PONDER_RPC_REQUESTS_PER_SECOND_1`
@@ -262,7 +278,7 @@ Optional:
 
 ## Verification
 
-After a local or production start:
+For a local process:
 
 ```bash
 curl -f http://127.0.0.1:42069/ready
@@ -271,11 +287,13 @@ curl -s 'http://127.0.0.1:42069/tokens?pageSize=3' | jq .
 curl -s 'http://127.0.0.1:42069/tokens/1/writes' | jq .
 ```
 
-For production, replace the host with:
+For the deployed indexer:
 
-```txt
-https://indexer.vessel.worldcomputer.art
-https://indexer.thevessel.fun
+```bash
+curl -f https://indexer.vessel.worldcomputer.art/ready
+curl -s https://indexer.vessel.worldcomputer.art/stats | jq .
+curl -s 'https://indexer.vessel.worldcomputer.art/tokens?pageSize=3' | jq .
+curl -s 'https://indexer.vessel.worldcomputer.art/tokens/1/writes' | jq .
 ```
 
 ## Operational Notes
