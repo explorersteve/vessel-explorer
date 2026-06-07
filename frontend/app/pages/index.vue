@@ -90,7 +90,13 @@
             class="feed-row"
           >
             <span class="col-action">
-              <span class="action-badge" :class="`action-${tx.action}`">{{ tx.action }}</span>
+              <span
+                class="action-badge"
+                :class="`action-${tx.action}`"
+                :title="tx.action"
+              >
+                {{ tx.action }}
+              </span>
             </span>
             <span class="col-id vessel-id-cell">
               <NuxtLink
@@ -592,6 +598,10 @@ onMounted(async () => {
   color: var(--muted);
 }
 
+.col-action {
+  min-width: 0;
+}
+
 .col-time {
   color: var(--text-faint);
   text-align: right;
@@ -602,6 +612,12 @@ onMounted(async () => {
 }
 
 .action-badge {
+  display: inline-block;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
   font-size: 11px;
   font-weight: 700;
   text-transform: lowercase;
