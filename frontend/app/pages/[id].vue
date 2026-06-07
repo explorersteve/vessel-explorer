@@ -343,16 +343,7 @@ let machineEventsRequestId = 0
 const activeEntry = ref(0)
 watch(() => vessel.value?.id, () => {
   if (vessel.value?.isVault && vessel.value.entries.length > 0) {
-    const chosen = Number(vessel.value.chosenEntry)
-    if (
-      Number.isInteger(chosen) &&
-      chosen > 0 &&
-      vessel.value.entries.some((entry) => entry.entryIndex === chosen)
-    ) {
-      activeEntry.value = chosen
-    } else {
-      activeEntry.value = latestEntryIndex(vessel.value.entries)
-    }
+    activeEntry.value = latestEntryIndex(vessel.value.entries)
   } else {
     activeEntry.value = 0
   }
