@@ -17,6 +17,7 @@ import {
   getAddress,
   hexToBytes,
   keccak256,
+  toEventSelector,
   type Hex,
 } from 'viem'
 
@@ -60,6 +61,7 @@ const TOKEN_SEED_BATCH_SIZE = 500
 const BLOCKS_PER_DAY = 7_200n
 const LOCK_DIVISOR = 10n
 const MAX_UINT256 = (1n << 256n) - 1n
+const PAYLOAD_SET_TOPIC = toEventSelector('PayloadSet(uint256,uint256)')
 
 const DETAIL_CALLS = [
   'craftToClaimed',
@@ -349,6 +351,7 @@ async function recoverPayloadSetsFromReceipt(context: Context, event: PonderEven
 
   for (const log of receipt.logs) {
     if (normalizeAddress(log.address as Address) !== normalizeAddress(VESSEL_ADDRESS)) continue
+    if (log.topics[0] !== PAYLOAD_SET_TOPIC) continue
 
     let args: { _tokenId?: bigint; _length?: bigint }
     try {
