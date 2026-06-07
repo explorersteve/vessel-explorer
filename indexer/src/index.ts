@@ -12,6 +12,7 @@ import {
   vesselEntry,
 } from 'ponder:schema'
 import {
+  decodeEventLog,
   encodePacked,
   getAddress,
   hexToBytes,
@@ -180,40 +181,7 @@ ponder.on('Vessel:Transfer', async ({ event, context }) => {
 })
 
 ponder.on('Vessel:PayloadSet', async ({ event, context }) => {
-  const tokenId = event.args._tokenId as bigint
-  const payloadBytes = Number(event.args._length ?? 0n)
-  const actor = actorFromEvent(event)
-  const state = await refreshTokenState(context, tokenId, {
-    blockNumber: event.block.number,
-    timestamp: event.block.timestamp,
-    touchPayload: true,
-  })
-  const entryIndex = state.isVault
-    ? Math.max(0, state.entryCount - 1)
-    : state.entryCount > 0
-      ? 0
-      : null
-  const payloadHex =
-    entryIndex !== null && state.isVault
-      ? await readVaultEntry(context, tokenId, entryIndex, event.block.number)
-      : state.payloadHex
-
-  await recordPayloadWrite(context, event, state, {
-    entryIndex,
-    payloadHex,
-    payloadBytes,
-    writer: actor,
-  })
-
-  await insertActivity(context, {
-    id: eventId(event),
-    type: 'write',
-    source_event: 'PayloadSet',
-    token_id: tokenId,
-    actor,
-    payload_bytes: payloadBytes,
-    ...eventMeta(event),
-  })
+  await handlePayloadSet(context, event)
 })
 
 ponder.on('Vessel:MachineSet', async ({ event, context }) => {
@@ -318,6 +286,7 @@ ponder.on('Vessel:MetadataUpdate', async ({ event, context }) => {
     timestamp: event.block.timestamp,
     touchPayload: true,
   })
+  await recoverPayloadSetsFromReceipt(context, event)
 
   await insertActivity(context, {
     id: eventId(event),
@@ -328,6 +297,88 @@ ponder.on('Vessel:MetadataUpdate', async ({ event, context }) => {
     ...eventMeta(event),
   })
 })
+
+async function handlePayloadSet(context: Context, event: PonderEvent) {
+  const tokenId = event.args._tokenId as bigint
+  const payloadBytes = Number(event.args._length ?? 0n)
+  const actor = actorFromEvent(event)
+  const state = await refreshTokenState(context, tokenId, {
+    blockNumber: event.block.number,
+    timestamp: event.block.timestamp,
+    touchPayload: true,
+  })
+  const entryIndex = state.isVault
+    ? Math.max(0, state.entryCount - 1)
+    : state.entryCount > 0
+      ? 0
+      : null
+  const payloadHex =
+    entryIndex !== null && state.isVault
+      ? await readVaultEntry(context, tokenId, entryIndex, event.block.number)
+      : state.payloadHex
+
+  await recordPayloadWrite(context, event, state, {
+    entryIndex,
+    payloadHex,
+    payloadBytes,
+    writer: actor,
+  })
+
+  await insertActivity(context, {
+    id: eventId(event),
+    type: 'write',
+    source_event: 'PayloadSet',
+    token_id: tokenId,
+    actor,
+    payload_bytes: payloadBytes,
+    ...eventMeta(event),
+  })
+}
+
+async function recoverPayloadSetsFromReceipt(context: Context, event: PonderEvent) {
+  let receipt: Awaited<ReturnType<typeof context.client.getTransactionReceipt>>
+  try {
+    receipt = await context.client.getTransactionReceipt({ hash: event.transaction.hash })
+  } catch (error) {
+    console.warn('PayloadSet receipt recovery failed', {
+      txHash: event.transaction.hash,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return
+  }
+
+  for (const log of receipt.logs) {
+    if (normalizeAddress(log.address as Address) !== normalizeAddress(VESSEL_ADDRESS)) continue
+
+    let args: { _tokenId?: bigint; _length?: bigint }
+    try {
+      const decoded = decodeEventLog({
+        abi: VesselAbi,
+        data: log.data,
+        eventName: 'PayloadSet',
+        topics: log.topics,
+      })
+      args = decoded.args as { _tokenId?: bigint; _length?: bigint }
+    } catch {
+      continue
+    }
+
+    const logIndex = Number(log.logIndex)
+    if (typeof args._tokenId !== 'bigint' || !Number.isInteger(logIndex) || logIndex < 0) {
+      continue
+    }
+
+    await handlePayloadSet(context, {
+      args: {
+        _tokenId: args._tokenId,
+        _length: args._length ?? 0n,
+      },
+      block: event.block,
+      log: { logIndex },
+      transaction: event.transaction,
+    })
+  }
+}
 
 ponder.on('Vessel:LockStarted', async ({ event, context }) => {
   await refreshProtocolFromChain(context, event.block.number, event.block.timestamp)

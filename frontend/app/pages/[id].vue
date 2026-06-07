@@ -51,7 +51,7 @@
             </div>
             <div v-if="vessel.isVault" class="meta-row">
               <span class="meta-label">chosen entry</span>
-              <span class="meta-value">{{ vessel.chosenEntry }}</span>
+              <span class="meta-value">{{ chosenEntryLabel }}</span>
             </div>
             <div class="meta-row">
               <span class="meta-label">color mode</span>
@@ -74,12 +74,12 @@
 
         <div v-if="vessel.isVault && vessel.entries.length > 1" class="entry-selector">
           <button
-            v-for="(_, idx) in vessel.entries"
-            :key="idx"
-            :class="['entry-btn', { active: activeEntry === idx }]"
-            @click="activeEntry = idx"
+            v-for="entry in vessel.entries"
+            :key="entry.entryIndex"
+            :class="['entry-btn', { active: activeEntry === entry.entryIndex }]"
+            @click="activeEntry = entry.entryIndex"
           >
-            entry {{ idx }}
+            entry {{ entry.entryIndex }}
           </button>
         </div>
 
@@ -344,10 +344,14 @@ const activeEntry = ref(0)
 watch(() => vessel.value?.id, () => {
   if (vessel.value?.isVault && vessel.value.entries.length > 0) {
     const chosen = Number(vessel.value.chosenEntry)
-    if (Number.isInteger(chosen) && chosen >= 0 && chosen < vessel.value.entries.length) {
+    if (
+      Number.isInteger(chosen) &&
+      chosen > 0 &&
+      vessel.value.entries.some((entry) => entry.entryIndex === chosen)
+    ) {
       activeEntry.value = chosen
     } else {
-      activeEntry.value = vessel.value.entries.length - 1
+      activeEntry.value = latestEntryIndex(vessel.value.entries)
     }
   } else {
     activeEntry.value = 0
@@ -357,11 +361,22 @@ watch(() => vessel.value?.id, () => {
 const activePayload = computed(() => {
   if (!vessel.value) return null
   if (vessel.value.isVault && vessel.value.entries.length > 0) {
-    const idx = Math.min(Math.max(activeEntry.value, 0), vessel.value.entries.length - 1)
-    return vessel.value.entries[idx] || null
+    const entry =
+      vessel.value.entries.find((candidate) => candidate.entryIndex === activeEntry.value) ??
+      vessel.value.entries[vessel.value.entries.length - 1]
+    return entry?.payload || null
   }
   return vessel.value.payload
 })
+
+const chosenEntryLabel = computed(() => {
+  if (!vessel.value?.isVault) return ''
+  return vessel.value.chosenEntry === 0 ? 'latest' : String(vessel.value.chosenEntry)
+})
+
+function latestEntryIndex(entries: Array<{ entryIndex: number }>) {
+  return entries[entries.length - 1]?.entryIndex ?? 0
+}
 
 const contentType = computed(() => {
   if (!activePayload.value?.length) return 'binary'

@@ -24,12 +24,17 @@ export interface VesselData {
   entryCount: number
   chosenEntry: number
   isVault: boolean
-  entries: Uint8Array[]
+  entries: VesselEntryData[]
   isMachine: boolean
   machineAddress: string | null
   machineName: string | null
   chosenMachine: string | null
   payload: Uint8Array | null
+}
+
+export interface VesselEntryData {
+  entryIndex: number
+  payload: Uint8Array
 }
 
 function vesselType(value: string | null | undefined): VesselType {
@@ -75,7 +80,10 @@ export function useVesselReader(tokenId: MaybeRefOrGetter<number | undefined>) {
         entryCount: Number(token.entryCount || entries.length || 0),
         chosenEntry: Number(token.chosenEntry || 0),
         isVault: Boolean(token.isVault),
-        entries: entries.map((entry) => bytesFromHex(entry.payloadHex)),
+        entries: entries.map((entry) => ({
+          entryIndex: Number(entry.entryIndex),
+          payload: bytesFromHex(entry.payloadHex),
+        })),
         isMachine: Boolean(token.isMachine),
         machineAddress: token.machineAddress,
         machineName: liveMachine?.name ?? null,
