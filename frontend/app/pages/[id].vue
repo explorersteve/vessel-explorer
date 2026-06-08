@@ -77,7 +77,7 @@
             v-for="entry in vessel.entries"
             :key="entry.entryIndex"
             :class="['entry-btn', { active: activeEntry === entry.entryIndex }]"
-            @click="activeEntry = entry.entryIndex"
+            @click="selectEntry(entry.entryIndex)"
           >
             entry {{ entry.entryIndex }}
           </button>
@@ -280,6 +280,7 @@ interface PayloadWriteResponse {
 }
 
 const WRITES_PAGE_SIZE = 25
+const DETAIL_REFRESH_MS = 15_000
 
 const router = useRouter()
 const route = useRoute()
@@ -324,7 +325,7 @@ const id = computed(() => {
   return isNaN(n) ? undefined : n
 })
 
-const { vessel, loading, error } = useVesselReader(id)
+const { vessel, loading, error, refresh } = useVesselReader(id)
 
 const showBytes = ref(false)
 const copied = ref(false)
@@ -341,13 +342,59 @@ const machineNames = ref<Record<string, string | null>>({})
 let machineEventsRequestId = 0
 
 const activeEntry = ref(0)
-watch(() => vessel.value?.id, () => {
-  if (vessel.value?.isVault && vessel.value.entries.length > 0) {
-    activeEntry.value = latestEntryIndex(vessel.value.entries)
+const entrySelectionTouched = ref(false)
+watch(
+  () => [
+    vessel.value?.id,
+    vessel.value?.isVault,
+    latestEntryIndex(vessel.value?.entries ?? []),
+  ] as const,
+  ([vesselId, isVault, latest], previous) => {
+    const previousVesselId = previous?.[0]
+    const previousLatest = previous?.[2]
+
+    if (!vesselId || !isVault || !vessel.value?.entries.length) {
+      activeEntry.value = 0
+      entrySelectionTouched.value = false
+      return
+    }
+
+    if (vesselId !== previousVesselId) entrySelectionTouched.value = false
+    if (!entrySelectionTouched.value || activeEntry.value === previousLatest) {
+      activeEntry.value = latest
+    }
+  },
+  { immediate: true },
+)
+
+function selectEntry(entryIndex: number) {
+  activeEntry.value = entryIndex
+  entrySelectionTouched.value = true
+}
+
+async function refreshDetail() {
+  if (!id.value) return
+  if (typeof document !== 'undefined' && document.hidden) return
+
+  await refresh()
+  if (!vessel.value) return
+
+  if (vessel.value.isMachine) {
+    await loadMachineEvents()
   } else {
-    activeEntry.value = 0
+    await loadWrites(1)
   }
-}, { immediate: true })
+}
+
+onMounted(() => {
+  const refreshInterval = window.setInterval(() => {
+    void refreshDetail()
+  }, DETAIL_REFRESH_MS)
+
+  onUnmounted(() => {
+    window.clearInterval(refreshInterval)
+  })
+})
 
 const activePayload = computed(() => {
   if (!vessel.value) return null

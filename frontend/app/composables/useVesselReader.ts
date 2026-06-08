@@ -37,6 +37,10 @@ export interface VesselEntryData {
   payload: Uint8Array
 }
 
+interface FetchVesselOptions {
+  silent?: boolean
+}
+
 function vesselType(value: string | null | undefined): VesselType {
   if (value === 'machine' || value === 'vault') return value
   return 'capsule'
@@ -48,11 +52,14 @@ export function useVesselReader(tokenId: MaybeRefOrGetter<number | undefined>) {
   const error = ref<string | null>(null)
   let requestSeq = 0
 
-  async function fetchVessel(id: number) {
+  async function fetchVessel(id: number, options: FetchVesselOptions = {}) {
     const seq = ++requestSeq
-    loading.value = true
-    error.value = null
-    vessel.value = null
+    const silent = options.silent === true
+    if (!silent) {
+      loading.value = true
+      error.value = null
+      vessel.value = null
+    }
 
     try {
       const token = await fetchToken(id)
@@ -92,10 +99,17 @@ export function useVesselReader(tokenId: MaybeRefOrGetter<number | undefined>) {
       }
     } catch (e: any) {
       if (seq !== requestSeq) return
-      error.value = e?.data?.message || e?.message || 'failed to fetch vessel'
+      if (!silent) {
+        error.value = e?.data?.message || e?.message || 'failed to fetch vessel'
+      }
     } finally {
-      if (seq === requestSeq) loading.value = false
+      if (seq === requestSeq && !silent) loading.value = false
     }
+  }
+
+  async function refresh() {
+    const id = toValue(tokenId)
+    if (id != null && id > 0) await fetchVessel(id, { silent: true })
   }
 
   watch(
@@ -106,5 +120,5 @@ export function useVesselReader(tokenId: MaybeRefOrGetter<number | undefined>) {
     { immediate: true },
   )
 
-  return { vessel, loading, error }
+  return { vessel, loading, error, refresh }
 }

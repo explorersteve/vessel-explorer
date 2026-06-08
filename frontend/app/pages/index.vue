@@ -86,7 +86,7 @@
           <div class="feed-date-separator">{{ group.label }}</div>
           <div
             v-for="tx in group.txs"
-            :key="tx.hash"
+            :key="activityKey(tx)"
             class="feed-row"
           >
             <span class="col-action">
@@ -161,6 +161,7 @@ const previewCanvas = ref<HTMLCanvasElement | null>(null)
 
 const actionTypes = ['claim', 'write', 'transfer', 'machine', 'delegate', 'setvaultentry'] as const
 const activeFilters = ref(new Set<string>(actionTypes))
+const ACTIVITY_REFRESH_MS = 15_000
 
 interface Holder {
   address: string
@@ -363,6 +364,10 @@ function renderPreview(data: Uint8Array, tokenId: number, colorMode: ColorMode =
 
 const showActions = new Set(['claim', 'transfer', 'write', 'machine', 'delegate', 'setvaultentry'])
 
+function activityKey(tx: VesselTransaction) {
+  return `${tx.hash}-${tx.action}-${tx.vesselId ?? ''}-${tx.blockNumber}`
+}
+
 function toggleFilter(action: string) {
   const f = activeFilters.value
   if (f.has(action)) {
@@ -395,6 +400,26 @@ async function loadMore() {
   finally { feedLoadingMore.value = false }
 }
 
+async function refreshLatestActivity() {
+  if (activeTab.value !== 'activity' || feedLoading.value || feedLoadingMore.value) return
+  if (typeof document !== 'undefined' && document.hidden) return
+
+  try {
+    const latest = await loadPage(1)
+    if (!latest.length) return
+
+    const latestKeys = new Set(latest.map(activityKey))
+    const maxRows = Math.max(1, feedPage.value) * 50
+    activity.value = [
+      ...latest,
+      ...activity.value.filter((tx) => !latestKeys.has(activityKey(tx))),
+    ].slice(0, maxRows)
+    feedError.value = null
+  } catch {
+    // Keep the existing feed visible if a background refresh fails.
+  }
+}
+
 onMounted(async () => {
   try {
     activity.value = await loadPage(1)
@@ -413,7 +438,14 @@ onMounted(async () => {
     if (el) observer.observe(el)
   }, { immediate: true })
 
-  onUnmounted(() => observer.disconnect())
+  const refreshInterval = window.setInterval(() => {
+    void refreshLatestActivity()
+  }, ACTIVITY_REFRESH_MS)
+
+  onUnmounted(() => {
+    observer.disconnect()
+    window.clearInterval(refreshInterval)
+  })
 })
 </script>
 
