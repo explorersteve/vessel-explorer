@@ -1,7 +1,5 @@
-const TOKEN_ENTRIES_CACHE_SECONDS = 10
-
-export default defineCachedEventHandler(async (event) => {
-  setApiCacheHeaders(event, TOKEN_ENTRIES_CACHE_SECONDS)
+export default defineEventHandler(async (event) => {
+  setNoStoreHeaders(event)
   const tokenId = String(getRouterParam(event, 'id') || '')
   if (!/^\d+$/.test(tokenId)) {
     throw createError({
@@ -11,4 +9,4 @@ export default defineCachedEventHandler(async (event) => {
   }
 
   return await fetchIndexerJson(`/tokens/${tokenId}/entries`)
-}, apiCacheOptions('vessel-token-entries', TOKEN_ENTRIES_CACHE_SECONDS))
+})

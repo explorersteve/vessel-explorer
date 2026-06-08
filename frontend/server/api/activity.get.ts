@@ -1,7 +1,5 @@
-const ACTIVITY_CACHE_SECONDS = 10
-
-export default defineCachedEventHandler(async (event) => {
-  setApiCacheHeaders(event, ACTIVITY_CACHE_SECONDS)
+export default defineEventHandler(async (event) => {
+  setNoStoreHeaders(event)
   const query = getQuery(event)
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query)) {
@@ -13,4 +11,4 @@ export default defineCachedEventHandler(async (event) => {
   }
 
   return await fetchIndexerJson('/activity', params)
-}, apiCacheOptions('vessel-activity', ACTIVITY_CACHE_SECONDS))
+})

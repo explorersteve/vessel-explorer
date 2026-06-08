@@ -8,6 +8,10 @@ export function setApiCacheHeaders(event: H3Event, maxAge: number, staleMaxAge =
   )
 }
 
+export function setNoStoreHeaders(event: H3Event) {
+  setHeader(event, 'Cache-Control', 'no-store, max-age=0')
+}
+
 export function apiCacheOptions(name: string, maxAge: number) {
   return {
     name,
