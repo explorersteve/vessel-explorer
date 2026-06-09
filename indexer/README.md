@@ -152,6 +152,24 @@ Normalized activity feed. Supports:
 - `tokenId` or `id`
 - `address`: matches actor, from, to, delegate, or machine address
 
+Seaport-backed secondary sales are returned as `action: "sale"` instead of
+`transfer`. Sale rows include `buyer`, `seller`, and `salePrice`:
+
+```json
+{
+  "action": "sale",
+  "buyer": "0x...",
+  "seller": "0x...",
+  "salePrice": {
+    "amountRaw": "4890000000000000",
+    "decimals": 18,
+    "symbol": "ETH",
+    "token": null,
+    "formatted": "0.00489 ETH"
+  }
+}
+```
+
 ### `GET /activity/daily`
 
 Daily activity aggregate used by the homepage heatmap. It returns every UTC day

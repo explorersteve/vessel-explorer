@@ -5,6 +5,7 @@ import schema, {
   activityEvent,
   payloadWrite,
   protocol,
+  seaportSale,
   token,
   transfer,
   vesselEntry,
@@ -271,10 +272,18 @@ app.get('/activity', async (c) => {
     SELECT
       ${activityEvent}.*,
       ${payloadWrite}.entry_index AS write_entry_index,
+      ${seaportSale}.buyer AS sale_buyer,
+      ${seaportSale}.seller AS sale_seller,
+      ${seaportSale}.payment_token AS sale_payment_token,
+      ${seaportSale}.payment_symbol AS sale_payment_symbol,
+      ${seaportSale}.payment_decimals AS sale_payment_decimals,
+      ${seaportSale}.payment_amount_raw AS sale_payment_amount_raw,
       ${token}.vessel_type AS craft_type
     FROM ${activityEvent}
     LEFT JOIN ${token}
       ON ${token}.token_id = ${activityEvent}.token_id
+    LEFT JOIN ${seaportSale}
+      ON ${seaportSale}.activity_id = ${activityEvent}.id
     LEFT JOIN ${payloadWrite}
       ON ${activityEvent}.type = 'write'
       AND ${payloadWrite}.token_id = ${activityEvent}.token_id
@@ -582,9 +591,11 @@ function activityToExplorerTx(row: Row) {
   const tokenId = row.token_id == null ? null : stringify(row.token_id)
   const action = String(row.type)
   const from = row.actor ?? row.from ?? row.to ?? ZERO_ADDRESS
+  const salePrice = salePriceForActivity(row)
 
   return {
     hash: row.tx_hash,
+    actor: row.actor ?? null,
     from,
     to: row.to ?? row.delegate ?? row.machine ?? ZERO_ADDRESS,
     timeStamp: stringify(row.timestamp),
@@ -596,6 +607,9 @@ function activityToExplorerTx(row: Row) {
     vesselId: tokenId,
     craftType: row.craft_type == null ? null : String(row.craft_type),
     entry: row.entry == null && row.write_entry_index != null ? Number(row.write_entry_index) : row.entry == null ? null : Number(row.entry),
+    buyer: row.sale_buyer ?? null,
+    seller: row.sale_seller ?? null,
+    ...(salePrice ? { salePrice } : {}),
     detail: detailForActivity(action, tokenId, row),
     _action: action,
     _vesselId: tokenId,
@@ -622,6 +636,8 @@ function functionNameForActivity(action: string) {
       return 'setApprovalForAll(address,bool)'
     case 'metadata':
       return 'refreshMetadata(uint256)'
+    case 'sale':
+      return 'Seaport.OrderFulfilled'
     default:
       return action
   }
@@ -642,6 +658,8 @@ function detailForActivity(action: string, tokenId: string | null, row: Row) {
       return `set entry ${Number(row.entry ?? 0)} on${suffix}`
     case 'transfer':
       return `transferred${suffix}`
+    case 'sale':
+      return `bought${suffix} from ${shortAddress(String(row.sale_seller ?? ''))} for ${salePriceText(row)}`
     case 'role':
       return `set role ${Number(row.role ?? 0)}`
     case 'metadata':
@@ -662,6 +680,40 @@ function writeDetail(row: Row, suffix: string) {
 
 function stringify(value: unknown) {
   return value == null ? '' : value.toString()
+}
+
+function salePriceForActivity(row: Row) {
+  if (String(row.type) !== 'sale') return null
+  return {
+    amountRaw: row.sale_payment_amount_raw == null ? null : String(row.sale_payment_amount_raw),
+    decimals: row.sale_payment_decimals == null ? null : Number(row.sale_payment_decimals),
+    symbol: String(row.sale_payment_symbol || 'MIXED'),
+    token: row.sale_payment_token == null ? null : String(row.sale_payment_token),
+    formatted: salePriceText(row),
+  }
+}
+
+function salePriceText(row: Row) {
+  const raw = row.sale_payment_amount_raw == null ? null : String(row.sale_payment_amount_raw)
+  const decimals = row.sale_payment_decimals == null ? null : Number(row.sale_payment_decimals)
+  const symbol = String(row.sale_payment_symbol || 'MIXED')
+  if (!raw || decimals === null || !Number.isInteger(decimals) || decimals < 0 || !/^\d+$/.test(raw)) {
+    return 'mixed payment'
+  }
+  return `${formatTokenAmount(raw, decimals)} ${symbol}`
+}
+
+function formatTokenAmount(raw: string, decimals: number) {
+  if (decimals === 0) return raw
+  const padded = raw.padStart(decimals + 1, '0')
+  const whole = padded.slice(0, -decimals) || '0'
+  const fraction = decimals > 0 ? padded.slice(-decimals).replace(/0+$/, '') : ''
+  return fraction ? `${whole}.${fraction}` : whole
+}
+
+function shortAddress(address: string) {
+  if (!ADDRESS_PATTERN.test(address)) return 'unknown'
+  return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
 
 function utcDateKey(date: Date) {
