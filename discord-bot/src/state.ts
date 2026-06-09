@@ -9,9 +9,12 @@ export async function readState(path: string): Promise<BotState> {
     return {
       cursor: normalizeCursor(parsed.cursor),
       lastSummaryWindowEnd: normalizeSummaryWindowEnd(parsed.lastSummaryWindowEnd),
+      lastForcedSummaryWindowEnd: normalizeSummaryWindowEnd(parsed.lastForcedSummaryWindowEnd),
     }
   } catch (error) {
-    if (isNotFound(error)) return { cursor: null, lastSummaryWindowEnd: null }
+    if (isNotFound(error)) {
+      return { cursor: null, lastSummaryWindowEnd: null, lastForcedSummaryWindowEnd: null }
+    }
     throw error
   }
 }

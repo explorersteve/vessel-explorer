@@ -12,6 +12,7 @@ import type { BotState, VesselActivity } from './types.js'
 let config: Config | null = null
 let ensResolver: EnsResolver | null = null
 let sendLatestOnStartPending = true
+let sendLatestDailySummaryOnStartPending = true
 
 let shuttingDown = false
 process.on('SIGINT', () => {
@@ -66,6 +67,9 @@ export async function pollOnce(state: BotState): Promise<BotState> {
 
 export async function summarizeOnce(state: BotState): Promise<BotState> {
   const activeConfig = getConfig()
+  const shouldSendLatestSummaryOnStart = activeConfig.dailySummarySendLatestOnStart
+    && sendLatestDailySummaryOnStartPending
+  let sentSummaryEnd: number | null = null
   const nextState = await processDailySummary(state, {
     schedule: {
       enabled: activeConfig.dailySummaryEnabled,
@@ -81,9 +85,16 @@ export async function summarizeOnce(state: BotState): Promise<BotState> {
     fetchStats: () => fetchStats(activeConfig.indexerUrl),
     send: (payload) => sendWithRetry(activeConfig.discordWebhookUrl, payload),
     save: (nextState) => writeState(activeConfig.stateFile, nextState),
+    forceLatest: shouldSendLatestSummaryOnStart,
+    onSent: (window) => {
+      sentSummaryEnd = window.endTime
+    },
   })
-  if (nextState.lastSummaryWindowEnd !== state.lastSummaryWindowEnd) {
-    console.log(`sent daily summary through ${nextState.lastSummaryWindowEnd}`)
+  if (shouldSendLatestSummaryOnStart && sentSummaryEnd !== null) {
+    sendLatestDailySummaryOnStartPending = false
+  }
+  if (sentSummaryEnd !== null) {
+    console.log(`sent daily summary through ${sentSummaryEnd}`)
   }
   return nextState
 }

@@ -24,6 +24,7 @@ export interface ActivityCursor {
 export interface BotState {
   cursor: ActivityCursor | null
   lastSummaryWindowEnd: number | null
+  lastForcedSummaryWindowEnd: number | null
 }
 
 export interface ProtocolStats {

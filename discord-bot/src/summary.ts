@@ -27,6 +27,8 @@ export interface ProcessDailySummaryOptions {
   send: (payload: DiscordEmbedPayload) => Promise<void>
   save: (state: BotState) => Promise<void>
   now?: Date
+  forceLatest?: boolean
+  onSent?: (window: SummaryWindow) => void
 }
 
 interface DateParts {
@@ -42,7 +44,9 @@ export async function processDailySummary(
   state: BotState,
   options: ProcessDailySummaryOptions,
 ) {
-  const window = latestDueSummaryWindow(options.schedule, state, options.now ?? new Date())
+  const window = latestDueSummaryWindow(options.schedule, state, options.now ?? new Date(), {
+    forceLatest: options.forceLatest ?? false,
+  })
   if (!window) return state
 
   const [activityRows, stats] = await Promise.all([
@@ -60,15 +64,21 @@ export async function processDailySummary(
   const payload = buildDailySummaryPayload(window, activities, stats, options.vesselBaseUrl)
   await options.send(payload)
 
-  const nextState = { ...state, lastSummaryWindowEnd: window.endTime }
+  const nextState = {
+    ...state,
+    lastSummaryWindowEnd: window.endTime,
+    ...(options.forceLatest ? { lastForcedSummaryWindowEnd: window.endTime } : {}),
+  }
   await options.save(nextState)
+  options.onSent?.(window)
   return nextState
 }
 
 export function latestDueSummaryWindow(
   schedule: SummarySchedule,
-  state: Pick<BotState, 'lastSummaryWindowEnd'>,
+  state: Pick<BotState, 'lastSummaryWindowEnd'> & { lastForcedSummaryWindowEnd?: number | null },
   now: Date,
+  options: { forceLatest?: boolean } = {},
 ): SummaryWindow | null {
   if (!schedule.enabled) return null
 
@@ -77,7 +87,12 @@ export function latestDueSummaryWindow(
   if (latestEnd.getTime() < firstEnd.getTime()) return null
 
   const endTime = Math.floor(latestEnd.getTime() / 1000)
-  if (state.lastSummaryWindowEnd !== null && state.lastSummaryWindowEnd >= endTime) {
+  if (options.forceLatest) {
+    const forcedEnd = state.lastForcedSummaryWindowEnd ?? null
+    if (forcedEnd !== null && forcedEnd >= endTime) {
+      return null
+    }
+  } else if (state.lastSummaryWindowEnd !== null && state.lastSummaryWindowEnd >= endTime) {
     return null
   }
 

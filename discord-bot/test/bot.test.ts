@@ -7,7 +7,7 @@ test('latest start mode records newest included event without sending backlog', 
   const sent: VesselActivity[] = []
   const saved: BotState[] = []
 
-  const state = await processActivities({ cursor: null, lastSummaryWindowEnd: null }, [
+  const state = await processActivities({ cursor: null, lastSummaryWindowEnd: null, lastForcedSummaryWindowEnd: null }, [
     activity({ hash: '0x2', blockNumber: '2', action: 'write' }),
     activity({ hash: '0x1', blockNumber: '1', action: 'claim' }),
   ], {
@@ -36,7 +36,7 @@ test('sendLatestOnStart sends newest included event once on empty state', async 
   const sent: VesselActivity[] = []
   const saved: BotState[] = []
 
-  const state = await processActivities({ cursor: null, lastSummaryWindowEnd: null }, [
+  const state = await processActivities({ cursor: null, lastSummaryWindowEnd: null, lastForcedSummaryWindowEnd: null }, [
     activity({ hash: '0x2', blockNumber: '2', action: 'write' }),
     activity({ hash: '0x1', blockNumber: '1', action: 'claim' }),
   ], {
@@ -66,7 +66,7 @@ test('sendLatestOnStart sends newest included event when cursor is already curre
     vesselId: '2623',
   }
 
-  const state = await processActivities({ cursor: current, lastSummaryWindowEnd: null }, [
+  const state = await processActivities({ cursor: current, lastSummaryWindowEnd: null, lastForcedSummaryWindowEnd: null }, [
     activity({ hash: '0x2', blockNumber: '2', action: 'write' }),
     activity({ hash: '0x1', blockNumber: '1', action: 'claim' }),
   ], {
@@ -97,6 +97,7 @@ test('sendLatestOnStart sends missed events once when cursor is behind', async (
       vesselId: '2623',
     },
     lastSummaryWindowEnd: null,
+    lastForcedSummaryWindowEnd: null,
   }, [
     activity({ hash: '0x3', blockNumber: '3', action: 'machine' }),
     activity({ hash: '0x2', blockNumber: '2', action: 'write' }),
@@ -118,7 +119,7 @@ test('sendLatestOnStart sends missed events once when cursor is behind', async (
 test('backfill sends included events once oldest-to-newest', async () => {
   const sent: VesselActivity[] = []
 
-  const state = await processActivities({ cursor: null, lastSummaryWindowEnd: null }, [
+  const state = await processActivities({ cursor: null, lastSummaryWindowEnd: null, lastForcedSummaryWindowEnd: null }, [
     activity({ hash: '0x3', blockNumber: '3', action: 'metadata' }),
     activity({ hash: '0x2', blockNumber: '2', action: 'write' }),
     activity({ hash: '0x1', blockNumber: '1', action: 'claim' }),
@@ -145,6 +146,7 @@ test('does not advance cursor when Discord send fails', async () => {
       vesselId: '2623',
     },
     lastSummaryWindowEnd: null,
+    lastForcedSummaryWindowEnd: null,
   }
   const saved: BotState[] = []
 

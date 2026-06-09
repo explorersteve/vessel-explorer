@@ -61,6 +61,30 @@ test('does not return duplicate summary window after restart', () => {
   )
 })
 
+test('can force the latest summary window on startup', () => {
+  const window = latestDueSummaryWindow(
+    schedule,
+    { lastSummaryWindowEnd: 1781031600 },
+    new Date('2026-06-09T19:30:00.000Z'),
+    { forceLatest: true },
+  )
+
+  assert.equal(window?.dayNumber, 106)
+  assert.equal(window?.endTime, 1781031600)
+})
+
+test('does not force the same latest summary window twice', () => {
+  assert.equal(
+    latestDueSummaryWindow(
+      schedule,
+      { lastSummaryWindowEnd: 1781031600, lastForcedSummaryWindowEnd: 1781031600 },
+      new Date('2026-06-09T19:30:00.000Z'),
+      { forceLatest: true },
+    ),
+    null,
+  )
+})
+
 test('builds active daily summary embed without description or footer', () => {
   const payload = buildDailySummaryPayload(window106(), [
     activity({ action: 'write', hash: '0x01', vesselId: '2623', from: '0x0000000000000000000000000000000000000001' }),
@@ -103,7 +127,11 @@ test('builds quiet daily summary embed without image, description, or footer', (
 })
 
 test('processDailySummary advances only after successful send', async () => {
-  const state: BotState = { cursor: null, lastSummaryWindowEnd: null }
+  const state: BotState = {
+    cursor: null,
+    lastSummaryWindowEnd: null,
+    lastForcedSummaryWindowEnd: null,
+  }
   const failedSaves: BotState[] = []
 
   await assert.rejects(processDailySummary(state, {
@@ -148,6 +176,35 @@ test('processDailySummary advances only after successful send', async () => {
   assert.equal(nextState.lastSummaryWindowEnd, 1781031600)
   assert.equal(saved.length, 1)
   assert.equal(saved[0]?.lastSummaryWindowEnd, 1781031600)
+})
+
+test('processDailySummary stores forced startup summary marker', async () => {
+  const sent: unknown[] = []
+  const saved: BotState[] = []
+  const nextState = await processDailySummary({
+    cursor: null,
+    lastSummaryWindowEnd: 1781031600,
+    lastForcedSummaryWindowEnd: null,
+  }, {
+    schedule,
+    excludedEventTypes: new Set(['transfer', 'metadata']),
+    vesselBaseUrl: 'https://vessel.worldcomputer.art',
+    now: new Date('2026-06-09T19:30:00.000Z'),
+    forceLatest: true,
+    fetchActivities: async () => [activity({ action: 'write' })],
+    fetchStats: async () => stats,
+    send: async (payload) => {
+      sent.push(payload)
+    },
+    save: async (state) => {
+      saved.push(state)
+    },
+  })
+
+  assert.equal(sent.length, 1)
+  assert.equal(nextState.lastSummaryWindowEnd, 1781031600)
+  assert.equal(nextState.lastForcedSummaryWindowEnd, 1781031600)
+  assert.equal(saved[0]?.lastForcedSummaryWindowEnd, 1781031600)
 })
 
 function window106(): SummaryWindow {

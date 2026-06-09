@@ -10,7 +10,11 @@ test('reads missing state as empty cursor and persists cursor', async () => {
   const path = join(dir, 'state.json')
 
   try {
-    assert.deepEqual(await readState(path), { cursor: null, lastSummaryWindowEnd: null })
+    assert.deepEqual(await readState(path), {
+      cursor: null,
+      lastSummaryWindowEnd: null,
+      lastForcedSummaryWindowEnd: null,
+    })
 
     const state = {
       cursor: {
@@ -20,6 +24,7 @@ test('reads missing state as empty cursor and persists cursor', async () => {
         vesselId: '2623',
       },
       lastSummaryWindowEnd: 1781031600,
+      lastForcedSummaryWindowEnd: 1781031600,
     }
     await writeState(path, state)
     assert.deepEqual(await readState(path), state)

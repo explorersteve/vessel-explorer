@@ -16,6 +16,7 @@ export interface Config {
   dailySummaryMinute: number
   dailySummaryWindowHours: number
   vesselDeployedAt: Date
+  dailySummarySendLatestOnStart: boolean
 }
 
 const DEFAULT_INDEXER_URL = 'https://indexer.vessel.worldcomputer.art'
@@ -57,6 +58,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     dailySummaryMinute: boundedIntegerEnv(env, 'DAILY_SUMMARY_MINUTE', DEFAULT_DAILY_SUMMARY_MINUTE, 0, 59),
     dailySummaryWindowHours: positiveIntegerEnv(env, 'DAILY_SUMMARY_WINDOW_HOURS', DEFAULT_DAILY_SUMMARY_WINDOW_HOURS),
     vesselDeployedAt: dateEnv(env, 'VESSEL_DEPLOYED_AT', DEFAULT_VESSEL_DEPLOYED_AT),
+    dailySummarySendLatestOnStart: booleanEnv(env, 'DAILY_SUMMARY_SEND_LATEST_ON_START', false),
   }
 }
 
