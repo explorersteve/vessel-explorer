@@ -644,7 +644,7 @@ function writeDetail(row: Row, suffix: string) {
   const bytes = Number(row.payload_bytes ?? 0).toLocaleString()
   const entry = row.entry == null && row.write_entry_index != null ? row.write_entry_index : row.entry
   const entryText = entry == null ? '' : ` to entry ${Number(entry)}`
-  return `wrote ${bytes} bytes${entryText} to${suffix}`
+  return `wrote ${bytes} bytes${entryText} on${suffix}`
 }
 
 function stringify(value: unknown) {
