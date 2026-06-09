@@ -112,6 +112,7 @@ function normalizeActivity(value: unknown): VesselActivity | null {
 
   return {
     hash,
+    actor: nullableString(row.actor),
     from: stringField(row.from),
     to: stringField(row.to),
     timeStamp: stringField(row.timeStamp),
@@ -123,7 +124,22 @@ function normalizeActivity(value: unknown): VesselActivity | null {
     vesselId: nullableString(row.vesselId ?? row._vesselId),
     craftType: nullableString(row.craftType ?? row._craftType),
     entry: numberField(row.entry),
+    buyer: nullableString(row.buyer),
+    seller: nullableString(row.seller),
+    salePrice: normalizeSalePrice(row.salePrice),
     detail: stringField(row.detail ?? row._detail),
+  }
+}
+
+function normalizeSalePrice(value: unknown): VesselActivity['salePrice'] {
+  if (!value || typeof value !== 'object') return undefined
+  const row = value as Record<string, unknown>
+  return {
+    amountRaw: nullableString(row.amountRaw),
+    decimals: numberField(row.decimals),
+    symbol: stringField(row.symbol) || 'MIXED',
+    token: nullableString(row.token),
+    formatted: stringField(row.formatted) || 'mixed payment',
   }
 }
 

@@ -1,5 +1,10 @@
 import type { VesselActivity } from './types.js'
 
+export interface ActivityDisplayNames {
+  actor?: string
+  seller?: string
+}
+
 export interface DiscordEmbedPayload {
   embeds: Array<{
     title: string
@@ -13,7 +18,7 @@ export interface DiscordEmbedPayload {
 export function buildDiscordPayload(
   activity: VesselActivity,
   vesselBaseUrl: string,
-  actor: string = shortenAddress(activity.from),
+  displayNames: string | ActivityDisplayNames = shortenAddress(activity.from),
 ): DiscordEmbedPayload {
   if (!activity.vesselId) {
     throw new Error('cannot build Discord payload for activity without vesselId')
@@ -26,7 +31,7 @@ export function buildDiscordPayload(
     embeds: [
       {
         title: actionTitle(activity),
-        description: `${sentenceForActivity(activity, actor)}\n\n${vesselUrl}`,
+        description: `${sentenceForActivity(activity, displayNames)}\n\n${vesselUrl}`,
         url: evmNowTxUrl(activity.hash),
         image: { url: imageUrl },
       },
@@ -70,12 +75,23 @@ export async function sendWithRetry(
   throw lastError
 }
 
-export function sentenceForActivity(activity: VesselActivity, actor = shortenAddress(activity.from)) {
+export function sentenceForActivity(
+  activity: VesselActivity,
+  displayNames: string | ActivityDisplayNames = shortenAddress(activity.from),
+) {
   if (!activity.vesselId) {
     throw new Error('cannot format activity without vesselId')
   }
 
+  const names = normalizeDisplayNames(displayNames)
+  if (activity.action.toLowerCase() === 'sale') {
+    const buyer = names.actor || shortenAddress(activity.buyer || activity.from)
+    const seller = names.seller || shortenAddress(activity.seller || activity.to)
+    return `**${escapeDiscordMarkdown(buyer)}** bought **${craftLabel(activity)} #${escapeDiscordMarkdown(activity.vesselId)}** from **${escapeDiscordMarkdown(seller)}** for **${escapeDiscordMarkdown(salePriceText(activity))}**`
+  }
+
   const action = activitySentenceFragment(activity)
+  const actor = names.actor || shortenAddress(activity.from)
   return `**${escapeDiscordMarkdown(actor)}** ${action} on **${craftLabel(activity)} #${escapeDiscordMarkdown(activity.vesselId)}**`
 }
 
@@ -142,9 +158,19 @@ function actionTitle(activity: VesselActivity) {
       return 'Role set'
     case 'lock':
       return 'Lock clock started'
+    case 'sale':
+      return 'Sale'
     default:
       return titleCase(action.replace(/[_-]+/g, ' '))
   }
+}
+
+function normalizeDisplayNames(value: string | ActivityDisplayNames): ActivityDisplayNames {
+  return typeof value === 'string' ? { actor: value } : value
+}
+
+function salePriceText(activity: VesselActivity) {
+  return activity.salePrice?.formatted || 'mixed payment'
 }
 
 function craftLabel(activity: VesselActivity) {

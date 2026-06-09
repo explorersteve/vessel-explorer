@@ -11,6 +11,19 @@ test('formats minimal activity sentences', () => {
   assert.equal(sentenceForActivity(activity({ action: 'delegate', detail: 'delegated #2623' })), '**0xabc1...def2** set delegate on **vault #2623**')
   assert.equal(sentenceForActivity(activity({ action: 'setvaultentry', detail: 'set entry 3 on #2623' })), '**0xabc1...def2** set vault entry 3 on **vault #2623**')
   assert.equal(sentenceForActivity(activity({ action: 'write' }), 'agent.yougogirl.eth'), '**agent.yougogirl.eth** wrote 2,623 bytes on **vault #2623**')
+  assert.equal(sentenceForActivity(activity({
+    action: 'sale',
+    vesselId: '303',
+    buyer: '0xb0b0000000000000000000000000000000000001',
+    seller: '0x5e11000000000000000000000000000000000002',
+    salePrice: {
+      amountRaw: '4890000000000000',
+      decimals: 18,
+      symbol: 'ETH',
+      token: null,
+      formatted: '0.00489 ETH',
+    },
+  }), { actor: 'buyer.eth', seller: 'seller.eth' }), '**buyer.eth** bought **vault #303** from **seller.eth** for **0.00489 ETH**')
 })
 
 test('builds Discord embed with vessel link and OG image', () => {
@@ -25,6 +38,7 @@ test('builds Discord embed with vessel link and OG image', () => {
 
 test('builds human action titles', () => {
   assert.equal(buildDiscordPayload(activity({ action: 'write', craftType: 'vault' }), 'https://vessel.worldcomputer.art').embeds[0]?.title, 'Vault write')
+  assert.equal(buildDiscordPayload(activity({ action: 'sale' }), 'https://vessel.worldcomputer.art').embeds[0]?.title, 'Sale')
   assert.equal(buildDiscordPayload(activity({ action: 'setvaultentry' }), 'https://vessel.worldcomputer.art').embeds[0]?.title, 'Vault entry set')
   assert.equal(buildDiscordPayload(activity({ action: 'delegate' }), 'https://vessel.worldcomputer.art').embeds[0]?.title, 'Delegate set')
 })

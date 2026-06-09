@@ -95,17 +95,18 @@ test('builds active daily summary embed with compact summary body', () => {
     activity({ action: 'write', hash: '0x06', vesselId: '2627' }),
     activity({ action: 'claim', hash: '0x07', vesselId: '728' }),
     activity({ action: 'claim', hash: '0x08', vesselId: '728' }),
-    activity({ action: 'setvaultentry', hash: '0x09', vesselId: '2623' }),
+    activity({ action: 'sale', hash: '0x09', vesselId: '303', from: '0x0000000000000000000000000000000000000006' }),
     activity({ action: 'setvaultentry', hash: '0x0a', vesselId: '2623' }),
-    activity({ action: 'machine', hash: '0x0b', vesselId: '5134' }),
-    activity({ action: 'delegate', hash: '0x0c', vesselId: '5134' }),
+    activity({ action: 'setvaultentry', hash: '0x0b', vesselId: '2623' }),
+    activity({ action: 'machine', hash: '0x0c', vesselId: '5134' }),
+    activity({ action: 'delegate', hash: '0x0d', vesselId: '5134' }),
   ], stats, 'https://vessel.worldcomputer.art')
 
   const embed = payload.embeds[0]
   assert.equal(embed?.title, 'Day 106')
   assert.equal(embed?.description, [
-    '12 interactions · 7 crafts touched · 5 actors',
-    'Claims: 2\nWrites: 6\nSetVaultEntries: 2\nSetMachines: 1\nSetDelegates: 1',
+    '13 interactions · 8 crafts touched · 6 actors',
+    'Claims: 2\nSales: 1\nWrites: 6\nSetVaultEntries: 2\nSetMachines: 1\nSetDelegates: 1',
     '***Protocol***\n960 / 10,000 claimed · 428 filled · 159 holders\n528,782 / 1,134,080 bytes filled',
   ].join('\n\n'))
   assert.equal(embed?.image?.url, 'https://vessel.worldcomputer.art/api/daily-grid?start=1780945200&end=1781031600')

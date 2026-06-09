@@ -165,7 +165,7 @@ function actionCountsDescription(actionCounts: Map<string, number>) {
 }
 
 function actionRank(action: string) {
-  const order = ['claim', 'write', 'setvaultentry', 'machine', 'delegate']
+  const order = ['claim', 'sale', 'write', 'setvaultentry', 'machine', 'delegate']
   const index = order.indexOf(action)
   return index === -1 ? order.length : index
 }
@@ -174,6 +174,8 @@ function actionLabel(action: string) {
   switch (action) {
     case 'claim':
       return 'Claims'
+    case 'sale':
+      return 'Sales'
     case 'write':
       return 'Writes'
     case 'setvaultentry':

@@ -102,8 +102,17 @@ export async function summarizeOnce(state: BotState): Promise<BotState> {
 
 async function sendActivity(activity: VesselActivity) {
   const activeConfig = getConfig()
-  const actor = await getEnsResolver().displayName(activity.from)
-  const payload = buildDiscordPayload(activity, activeConfig.vesselBaseUrl, actor)
+  const resolver = getEnsResolver()
+  const actorAddress = activity.action.toLowerCase() === 'sale'
+    ? activity.buyer || activity.from
+    : activity.from
+  const [actor, seller] = await Promise.all([
+    resolver.displayName(actorAddress),
+    activity.action.toLowerCase() === 'sale' && activity.seller
+      ? resolver.displayName(activity.seller)
+      : Promise.resolve(undefined),
+  ])
+  const payload = buildDiscordPayload(activity, activeConfig.vesselBaseUrl, { actor, seller })
   await sendWithRetry(activeConfig.discordWebhookUrl, payload)
   console.log(`sent ${activity.action} #${activity.vesselId} ${activity.hash}`)
 }

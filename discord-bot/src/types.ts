@@ -1,5 +1,6 @@
 export interface VesselActivity {
   hash: string
+  actor?: string | null
   from: string
   to: string
   timeStamp: string
@@ -11,6 +12,15 @@ export interface VesselActivity {
   vesselId: string | null
   craftType: string | null
   entry: number | null
+  buyer?: string | null
+  seller?: string | null
+  salePrice?: {
+    amountRaw: string | null
+    decimals: number | null
+    symbol: string
+    token: string | null
+    formatted: string
+  }
   detail: string
 }
 

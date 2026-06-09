@@ -16,6 +16,7 @@ test('skips transfer and metadata events by default', () => {
   assert.equal(isIncludedActivity(activity({ action: 'metadata' }), excluded), false)
   assert.equal(isIncludedActivity(activity({ action: 'unknown', functionName: 'refreshMetadata(uint256)' }), excluded), false)
   assert.equal(isIncludedActivity(activity({ action: 'write' }), excluded), true)
+  assert.equal(isIncludedActivity(activity({ action: 'sale' }), excluded), true)
 })
 
 test('skips rows without vesselId', () => {
