@@ -9,6 +9,7 @@ import type { BotState, VesselActivity } from './types.js'
 export interface ProcessActivitiesOptions {
   excludedEventTypes: Set<string>
   startMode: StartMode
+  sendLatestOnStart: boolean
   send: (activity: VesselActivity) => Promise<void>
   save: (state: BotState) => Promise<void>
 }
@@ -22,14 +23,29 @@ export async function processActivities(
     isIncludedActivity(activity, options.excludedEventTypes),
   )
 
+  if (!state.cursor && options.sendLatestOnStart && activities[0]) {
+    await options.send(activities[0])
+    const nextState = { cursor: cursorForActivity(activities[0]) }
+    await options.save(nextState)
+    return nextState
+  }
+
   if (!state.cursor && options.startMode === 'latest') {
     const nextState = { cursor: activities[0] ? cursorForActivity(activities[0]) : null }
     await options.save(nextState)
     return nextState
   }
 
+  const newActivities = newActivitiesSinceCursor(activities, state.cursor)
+  if (options.sendLatestOnStart && activities[0] && newActivities.length === 0) {
+    await options.send(activities[0])
+    const nextState = { cursor: cursorForActivity(activities[0]) }
+    await options.save(nextState)
+    return nextState
+  }
+
   let nextState = state
-  for (const activity of newActivitiesSinceCursor(activities, state.cursor)) {
+  for (const activity of newActivities) {
     await options.send(activity)
     nextState = { cursor: cursorForActivity(activity) }
     await options.save(nextState)

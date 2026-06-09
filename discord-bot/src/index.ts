@@ -10,6 +10,7 @@ import type { BotState, VesselActivity } from './types.js'
 
 let config: Config | null = null
 let ensResolver: EnsResolver | null = null
+let sendLatestOnStartPending = true
 
 let shuttingDown = false
 process.on('SIGINT', () => {
@@ -43,12 +44,18 @@ async function run() {
 export async function pollOnce(state: BotState): Promise<BotState> {
   const activeConfig = getConfig()
   const activities = await fetchActivity(activeConfig.indexerUrl, 100)
-  return await processActivities(state, activities, {
+  const shouldSendLatestOnStart = activeConfig.sendLatestOnStart && sendLatestOnStartPending
+  const nextState = await processActivities(state, activities, {
     excludedEventTypes: activeConfig.excludedEventTypes,
     startMode: activeConfig.startMode,
+    sendLatestOnStart: shouldSendLatestOnStart,
     send: sendActivity,
     save: (nextState) => writeState(activeConfig.stateFile, nextState),
   })
+  if (shouldSendLatestOnStart) {
+    sendLatestOnStartPending = false
+  }
+  return nextState
 }
 
 async function sendActivity(activity: VesselActivity) {

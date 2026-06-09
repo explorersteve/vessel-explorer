@@ -42,3 +42,4 @@ DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/... pnpm start
 - `START_MODE=latest`
 - `STATE_FILE=/data/state.json`
 - `EXCLUDED_EVENT_TYPES=transfer,metadata`
+- `SEND_LATEST_ON_START=true`

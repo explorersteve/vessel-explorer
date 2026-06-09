@@ -31,6 +31,7 @@ env:
     START_MODE: '<%= ENV["START_MODE"] || "latest" %>'
     STATE_FILE: '<%= ENV["STATE_FILE"] || "/data/state.json" %>'
     EXCLUDED_EVENT_TYPES: '<%= ENV["EXCLUDED_EVENT_TYPES"] || "transfer,metadata" %>'
+    SEND_LATEST_ON_START: '<%= ENV["SEND_LATEST_ON_START"] || "true" %>'
   secret:
     - DISCORD_WEBHOOK_URL
 

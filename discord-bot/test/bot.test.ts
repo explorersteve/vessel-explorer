@@ -13,6 +13,7 @@ test('latest start mode records newest included event without sending backlog', 
   ], {
     excludedEventTypes: new Set(['transfer', 'metadata']),
     startMode: 'latest',
+    sendLatestOnStart: false,
     send: async (row) => {
       sent.push(row)
     },
@@ -31,6 +32,88 @@ test('latest start mode records newest included event without sending backlog', 
   assert.deepEqual(saved, [state])
 })
 
+test('sendLatestOnStart sends newest included event once on empty state', async () => {
+  const sent: VesselActivity[] = []
+  const saved: BotState[] = []
+
+  const state = await processActivities({ cursor: null }, [
+    activity({ hash: '0x2', blockNumber: '2', action: 'write' }),
+    activity({ hash: '0x1', blockNumber: '1', action: 'claim' }),
+  ], {
+    excludedEventTypes: new Set(['transfer', 'metadata']),
+    startMode: 'latest',
+    sendLatestOnStart: true,
+    send: async (row) => {
+      sent.push(row)
+    },
+    save: async (nextState) => {
+      saved.push(nextState)
+    },
+  })
+
+  assert.deepEqual(sent.map((row) => row.hash), ['0x2'])
+  assert.deepEqual(saved, [state])
+  assert.equal(state.cursor?.hash, '0x2')
+})
+
+test('sendLatestOnStart sends newest included event when cursor is already current', async () => {
+  const sent: VesselActivity[] = []
+  const saved: BotState[] = []
+  const current = {
+    blockNumber: '2',
+    hash: '0x2',
+    action: 'write',
+    vesselId: '2623',
+  }
+
+  const state = await processActivities({ cursor: current }, [
+    activity({ hash: '0x2', blockNumber: '2', action: 'write' }),
+    activity({ hash: '0x1', blockNumber: '1', action: 'claim' }),
+  ], {
+    excludedEventTypes: new Set(['transfer', 'metadata']),
+    startMode: 'latest',
+    sendLatestOnStart: true,
+    send: async (row) => {
+      sent.push(row)
+    },
+    save: async (nextState) => {
+      saved.push(nextState)
+    },
+  })
+
+  assert.deepEqual(sent.map((row) => row.hash), ['0x2'])
+  assert.deepEqual(saved, [state])
+  assert.deepEqual(state.cursor, current)
+})
+
+test('sendLatestOnStart sends missed events once when cursor is behind', async () => {
+  const sent: VesselActivity[] = []
+
+  const state = await processActivities({
+    cursor: {
+      blockNumber: '1',
+      hash: '0x1',
+      action: 'claim',
+      vesselId: '2623',
+    },
+  }, [
+    activity({ hash: '0x3', blockNumber: '3', action: 'machine' }),
+    activity({ hash: '0x2', blockNumber: '2', action: 'write' }),
+    activity({ hash: '0x1', blockNumber: '1', action: 'claim' }),
+  ], {
+    excludedEventTypes: new Set(['transfer', 'metadata']),
+    startMode: 'latest',
+    sendLatestOnStart: true,
+    send: async (row) => {
+      sent.push(row)
+    },
+    save: async () => {},
+  })
+
+  assert.deepEqual(sent.map((row) => row.hash), ['0x2', '0x3'])
+  assert.equal(state.cursor?.hash, '0x3')
+})
+
 test('backfill sends included events once oldest-to-newest', async () => {
   const sent: VesselActivity[] = []
 
@@ -41,6 +124,7 @@ test('backfill sends included events once oldest-to-newest', async () => {
   ], {
     excludedEventTypes: new Set(['transfer', 'metadata']),
     startMode: 'backfill',
+    sendLatestOnStart: false,
     send: async (row) => {
       sent.push(row)
     },
@@ -69,6 +153,7 @@ test('does not advance cursor when Discord send fails', async () => {
     ], {
       excludedEventTypes: new Set(['transfer', 'metadata']),
       startMode: 'latest',
+      sendLatestOnStart: false,
       send: async () => {
         throw new Error('webhook down')
       },

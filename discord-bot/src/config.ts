@@ -9,6 +9,7 @@ export interface Config {
   startMode: StartMode
   stateFile: string
   excludedEventTypes: Set<string>
+  sendLatestOnStart: boolean
 }
 
 const DEFAULT_INDEXER_URL = 'https://indexer.vessel.worldcomputer.art'
@@ -38,6 +39,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     startMode,
     stateFile: env.STATE_FILE || DEFAULT_STATE_FILE,
     excludedEventTypes: commaSet(env.EXCLUDED_EVENT_TYPES || DEFAULT_EXCLUDED_EVENT_TYPES),
+    sendLatestOnStart: booleanEnv(env, 'SEND_LATEST_ON_START', true),
   }
 }
 
@@ -63,6 +65,12 @@ function commaSet(value: string) {
       .map((item) => item.trim().toLowerCase())
       .filter(Boolean),
   )
+}
+
+function booleanEnv(env: NodeJS.ProcessEnv, key: string, fallback: boolean) {
+  const value = env[key]?.trim().toLowerCase()
+  if (!value) return fallback
+  return ['1', 'true', 'yes', 'on'].includes(value)
 }
 
 function trimTrailingSlash(value: string) {
