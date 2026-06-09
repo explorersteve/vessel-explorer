@@ -1,8 +1,22 @@
-import type { ActivityCursor, VesselActivity } from './types.js'
+import type { ActivityCursor, ProtocolStats, VesselActivity } from './types.js'
 
-export async function fetchActivity(indexerUrl: string, limit = 100): Promise<VesselActivity[]> {
+export interface FetchActivityOptions {
+  limit?: number
+  page?: number
+  startTime?: number
+  endTime?: number
+}
+
+export async function fetchActivity(
+  indexerUrl: string,
+  options: FetchActivityOptions | number = {},
+): Promise<VesselActivity[]> {
+  const resolved = typeof options === 'number' ? { limit: options } : options
   const url = new URL('/activity', indexerUrl)
-  url.searchParams.set('limit', String(limit))
+  url.searchParams.set('limit', String(resolved.limit ?? 100))
+  if (resolved.page !== undefined) url.searchParams.set('page', String(resolved.page))
+  if (resolved.startTime !== undefined) url.searchParams.set('startTime', String(resolved.startTime))
+  if (resolved.endTime !== undefined) url.searchParams.set('endTime', String(resolved.endTime))
 
   const response = await fetch(url)
   if (!response.ok) {
@@ -12,6 +26,29 @@ export async function fetchActivity(indexerUrl: string, limit = 100): Promise<Ve
   const data = await response.json()
   if (!Array.isArray(data)) return []
   return data.map(normalizeActivity).filter(Boolean) as VesselActivity[]
+}
+
+export async function fetchAllActivity(
+  indexerUrl: string,
+  options: Omit<FetchActivityOptions, 'page'>,
+) {
+  const limit = options.limit ?? 1000
+  const rows: VesselActivity[] = []
+  for (let page = 1; ; page++) {
+    const pageRows = await fetchActivity(indexerUrl, { ...options, limit, page })
+    rows.push(...pageRows)
+    if (pageRows.length < limit) return rows
+  }
+}
+
+export async function fetchStats(indexerUrl: string): Promise<ProtocolStats> {
+  const url = new URL('/stats', indexerUrl)
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`indexer stats request failed: ${response.status} ${response.statusText}`)
+  }
+
+  return normalizeStats(await response.json())
 }
 
 export function isIncludedActivity(
@@ -87,6 +124,24 @@ function normalizeActivity(value: unknown): VesselActivity | null {
     craftType: nullableString(row.craftType ?? row._craftType),
     entry: numberField(row.entry),
     detail: stringField(row.detail ?? row._detail),
+  }
+}
+
+function normalizeStats(value: unknown): ProtocolStats {
+  const row = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const tokens = row.tokens && typeof row.tokens === 'object'
+    ? row.tokens as Record<string, unknown>
+    : {}
+
+  return {
+    tokens: {
+      total: numberField(tokens.total) ?? 0,
+      claimed: numberField(tokens.claimed) ?? 0,
+      filled: numberField(tokens.filled) ?? 0,
+      claimedCapacityBytes: numberField(tokens.claimedCapacityBytes) ?? 0,
+      filledBytes: numberField(tokens.filledBytes) ?? 0,
+      uniqueHolders: numberField(tokens.uniqueHolders) ?? 0,
+    },
   }
 }
 

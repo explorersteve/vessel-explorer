@@ -3,6 +3,7 @@
 Polls the Vessel indexer activity feed and posts new vessel interactions to a Discord webhook.
 
 The bot skips `transfer` and `metadata` events by default, skips rows without a vessel id, and posts one embed per included activity row.
+It also posts a once-daily summary at 3:00 PM New York time with protocol stats, action counts, and a grid image of all touched crafts.
 
 ## Message Shape
 
@@ -43,3 +44,9 @@ DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/... pnpm start
 - `STATE_FILE=/data/state.json`
 - `EXCLUDED_EVENT_TYPES=transfer,metadata`
 - `SEND_LATEST_ON_START=true`
+- `DAILY_SUMMARY_ENABLED=true`
+- `DAILY_SUMMARY_TIMEZONE=America/New_York`
+- `DAILY_SUMMARY_HOUR=15`
+- `DAILY_SUMMARY_MINUTE=0`
+- `DAILY_SUMMARY_WINDOW_HOURS=24`
+- `VESSEL_DEPLOYED_AT=2026-02-24T04:59:35.000Z`

@@ -1,0 +1,179 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import {
+  buildDailySummaryPayload,
+  latestDueSummaryWindow,
+  processDailySummary,
+  type SummarySchedule,
+  type SummaryWindow,
+} from '../src/summary.js'
+import type { BotState, ProtocolStats, VesselActivity } from '../src/types.js'
+
+const schedule: SummarySchedule = {
+  enabled: true,
+  timeZone: 'America/New_York',
+  hour: 15,
+  minute: 0,
+  windowHours: 24,
+  deployedAt: new Date('2026-02-24T04:59:35.000Z'),
+}
+
+const stats: ProtocolStats = {
+  tokens: {
+    total: 10_000,
+    claimed: 960,
+    filled: 428,
+    claimedCapacityBytes: 1_134_080,
+    filledBytes: 528_782,
+    uniqueHolders: 159,
+  },
+}
+
+test('calculates day numbers from deploy anchor', () => {
+  const day1 = latestDueSummaryWindow(
+    schedule,
+    { lastSummaryWindowEnd: null },
+    new Date('2026-02-24T20:00:00.000Z'),
+  )
+  assert.equal(day1?.dayNumber, 1)
+  assert.equal(day1?.startTime, 1771876800)
+  assert.equal(day1?.endTime, 1771963200)
+
+  const day106 = latestDueSummaryWindow(
+    schedule,
+    { lastSummaryWindowEnd: null },
+    new Date('2026-06-09T19:00:00.000Z'),
+  )
+  assert.equal(day106?.dayNumber, 106)
+  assert.equal(day106?.startTime, 1780945200)
+  assert.equal(day106?.endTime, 1781031600)
+  assert.equal(day106?.label, 'Jun 8, 3:00 PM - Jun 9, 3:00 PM ET')
+})
+
+test('does not return duplicate summary window after restart', () => {
+  assert.equal(
+    latestDueSummaryWindow(
+      schedule,
+      { lastSummaryWindowEnd: 1781031600 },
+      new Date('2026-06-09T19:30:00.000Z'),
+    ),
+    null,
+  )
+})
+
+test('builds active daily summary embed without description or footer', () => {
+  const payload = buildDailySummaryPayload(window106(), [
+    activity({ action: 'write', hash: '0x01', vesselId: '2623', from: '0x0000000000000000000000000000000000000001' }),
+    activity({ action: 'write', hash: '0x02', vesselId: '2623', from: '0x0000000000000000000000000000000000000002' }),
+    activity({ action: 'write', hash: '0x03', vesselId: '2624', from: '0x0000000000000000000000000000000000000003' }),
+    activity({ action: 'write', hash: '0x04', vesselId: '2625', from: '0x0000000000000000000000000000000000000004' }),
+    activity({ action: 'write', hash: '0x05', vesselId: '2626', from: '0x0000000000000000000000000000000000000005' }),
+    activity({ action: 'write', hash: '0x06', vesselId: '2627' }),
+    activity({ action: 'claim', hash: '0x07', vesselId: '728' }),
+    activity({ action: 'claim', hash: '0x08', vesselId: '728' }),
+    activity({ action: 'setvaultentry', hash: '0x09', vesselId: '2623' }),
+    activity({ action: 'setvaultentry', hash: '0x0a', vesselId: '2623' }),
+    activity({ action: 'machine', hash: '0x0b', vesselId: '5134' }),
+    activity({ action: 'delegate', hash: '0x0c', vesselId: '5134' }),
+  ], stats, 'https://vessel.worldcomputer.art')
+
+  const embed = payload.embeds[0]
+  assert.equal(embed?.title, 'Day 106')
+  assert.equal(embed?.fields?.[0]?.name, 'Jun 8, 3:00 PM - Jun 9, 3:00 PM ET')
+  assert.equal(embed?.fields?.[0]?.value, '12 interactions · 7 crafts touched · 5 actors')
+  assert.equal(embed?.fields?.[1]?.name, 'Protocol')
+  assert.equal(embed?.fields?.[1]?.value, '960 / 10,000 claimed · 428 filled · 159 holders\n528,782 / 1,134,080 bytes filled')
+  assert.equal(embed?.fields?.[2]?.name, 'Actions')
+  assert.equal(embed?.fields?.[2]?.value, 'write 6 · claim 2 · setvaultentry 2 · machine 1 · delegate 1')
+  assert.equal(embed?.image?.url, 'https://vessel.worldcomputer.art/api/daily-grid?start=1780945200&end=1781031600')
+  assert.equal('description' in embed!, false)
+  assert.equal('footer' in embed!, false)
+})
+
+test('builds quiet daily summary embed without image, description, or footer', () => {
+  const payload = buildDailySummaryPayload(window106(), [], stats, 'https://vessel.worldcomputer.art')
+  const embed = payload.embeds[0]
+
+  assert.equal(embed?.title, 'Day 106')
+  assert.equal(embed?.fields?.length, 2)
+  assert.equal(embed?.fields?.[0]?.value, 'No vessel interactions.')
+  assert.equal(embed?.image, undefined)
+  assert.equal('description' in embed!, false)
+  assert.equal('footer' in embed!, false)
+})
+
+test('processDailySummary advances only after successful send', async () => {
+  const state: BotState = { cursor: null, lastSummaryWindowEnd: null }
+  const failedSaves: BotState[] = []
+
+  await assert.rejects(processDailySummary(state, {
+    schedule,
+    excludedEventTypes: new Set(['transfer', 'metadata']),
+    vesselBaseUrl: 'https://vessel.worldcomputer.art',
+    now: new Date('2026-06-09T19:00:00.000Z'),
+    fetchActivities: async () => [activity({ action: 'write' })],
+    fetchStats: async () => stats,
+    send: async () => {
+      throw new Error('webhook failed')
+    },
+    save: async (nextState) => {
+      failedSaves.push(nextState)
+    },
+  }), /webhook failed/)
+
+  assert.deepEqual(failedSaves, [])
+
+  const sent: unknown[] = []
+  const saved: BotState[] = []
+  const nextState = await processDailySummary(state, {
+    schedule,
+    excludedEventTypes: new Set(['transfer', 'metadata']),
+    vesselBaseUrl: 'https://vessel.worldcomputer.art',
+    now: new Date('2026-06-09T19:00:00.000Z'),
+    fetchActivities: async () => [
+      activity({ action: 'transfer' }),
+      activity({ action: 'metadata' }),
+      activity({ action: 'write' }),
+    ],
+    fetchStats: async () => stats,
+    send: async (payload) => {
+      sent.push(payload)
+    },
+    save: async (nextState) => {
+      saved.push(nextState)
+    },
+  })
+
+  assert.equal(sent.length, 1)
+  assert.equal(nextState.lastSummaryWindowEnd, 1781031600)
+  assert.equal(saved.length, 1)
+  assert.equal(saved[0]?.lastSummaryWindowEnd, 1781031600)
+})
+
+function window106(): SummaryWindow {
+  return {
+    startTime: 1780945200,
+    endTime: 1781031600,
+    dayNumber: 106,
+    label: 'Jun 8, 3:00 PM - Jun 9, 3:00 PM ET',
+  }
+}
+
+function activity(overrides: Partial<VesselActivity> = {}): VesselActivity {
+  return {
+    hash: '0xhash',
+    from: '0x0000000000000000000000000000000000000001',
+    to: '0x0000000000000000000000000000000000000000',
+    timeStamp: '1780943435',
+    blockNumber: '25274501',
+    input: '0x',
+    isError: '0',
+    functionName: '',
+    action: 'write',
+    vesselId: '2623',
+    craftType: 'vault',
+    entry: null,
+    detail: 'wrote 2,623 bytes to #2623',
+    ...overrides,
+  }
+}

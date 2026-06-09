@@ -23,4 +23,16 @@ export interface ActivityCursor {
 
 export interface BotState {
   cursor: ActivityCursor | null
+  lastSummaryWindowEnd: number | null
+}
+
+export interface ProtocolStats {
+  tokens: {
+    total: number
+    claimed: number
+    filled: number
+    claimedCapacityBytes: number
+    filledBytes: number
+    uniqueHolders: number
+  }
 }

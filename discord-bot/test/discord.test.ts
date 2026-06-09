@@ -18,7 +18,7 @@ test('builds Discord embed with vessel link and OG image', () => {
 
   assert.equal(payload.embeds[0]?.title, 'Machine set')
   assert.equal(payload.embeds[0]?.url, 'https://evm.now/tx/0xhash')
-  assert.equal(payload.embeds[0]?.image.url, 'https://vessel.worldcomputer.art/api/og/5134?v=25274501-machine-5134-1780943435')
+  assert.equal(payload.embeds[0]?.image?.url, 'https://vessel.worldcomputer.art/api/og/5134?v=25274501-machine-5134-1780943435')
   assert.match(payload.embeds[0]?.description || '', /\n\nhttps:\/\/vessel\.worldcomputer\.art\/5134/)
   assert.match(payload.embeds[0]?.description || '', /https:\/\/vessel\.worldcomputer\.art\/5134/)
 })

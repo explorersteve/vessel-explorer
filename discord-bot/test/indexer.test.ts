@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   cursorForActivity,
+  fetchActivity,
+  fetchAllActivity,
   isIncludedActivity,
   newActivitiesSinceCursor,
 } from '../src/indexer.js'
@@ -39,6 +41,60 @@ test('with no cursor, backfill order is oldest-to-newest', () => {
 
   const rows = newActivitiesSinceCursor(newestFirst, null)
   assert.deepEqual(rows.map((row) => row.hash), ['0x2', '0x3'])
+})
+
+test('fetchActivity sends pagination and time range filters', async () => {
+  const originalFetch = globalThis.fetch
+  const requests: string[] = []
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requests.push(String(input))
+    return Response.json([activity({ hash: '0x1' })])
+  }) as typeof fetch
+
+  try {
+    await fetchActivity('https://indexer.example', {
+      limit: 1000,
+      page: 2,
+      startTime: 1780945200,
+      endTime: 1781031600,
+    })
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+
+  const url = new URL(requests[0]!)
+  assert.equal(url.pathname, '/activity')
+  assert.equal(url.searchParams.get('limit'), '1000')
+  assert.equal(url.searchParams.get('page'), '2')
+  assert.equal(url.searchParams.get('startTime'), '1780945200')
+  assert.equal(url.searchParams.get('endTime'), '1781031600')
+})
+
+test('fetchAllActivity paginates until a short page', async () => {
+  const originalFetch = globalThis.fetch
+  const requests: string[] = []
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requests.push(String(input))
+    const page = new URL(String(input)).searchParams.get('page')
+    return Response.json(page === '1'
+      ? [activity({ hash: '0x1' }), activity({ hash: '0x2' })]
+      : [activity({ hash: '0x3' })])
+  }) as typeof fetch
+
+  try {
+    const rows = await fetchAllActivity('https://indexer.example', {
+      limit: 2,
+      startTime: 10,
+      endTime: 20,
+    })
+    assert.deepEqual(rows.map((row) => row.hash), ['0x1', '0x2', '0x3'])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+
+  assert.equal(requests.length, 2)
+  assert.equal(new URL(requests[0]!).searchParams.get('page'), '1')
+  assert.equal(new URL(requests[1]!).searchParams.get('page'), '2')
 })
 
 function activity(overrides: Partial<VesselActivity> = {}): VesselActivity {

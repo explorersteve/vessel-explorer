@@ -3,8 +3,9 @@ import { loadConfig } from './config.js'
 import { processActivities } from './bot.js'
 import { buildDiscordPayload, sendWithRetry } from './discord.js'
 import { createEnsResolver, type EnsResolver } from './ens.js'
-import { fetchActivity } from './indexer.js'
+import { fetchActivity, fetchAllActivity, fetchStats } from './indexer.js'
 import { readState, writeState } from './state.js'
+import { processDailySummary } from './summary.js'
 import type { Config } from './config.js'
 import type { BotState, VesselActivity } from './types.js'
 
@@ -35,6 +36,11 @@ async function run() {
     } catch (error) {
       console.error('poll failed', error)
     }
+    try {
+      state = await summarizeOnce(state)
+    } catch (error) {
+      console.error('daily summary failed', error)
+    }
     await sleep(activeConfig.pollIntervalMs)
   }
 
@@ -54,6 +60,30 @@ export async function pollOnce(state: BotState): Promise<BotState> {
   })
   if (shouldSendLatestOnStart) {
     sendLatestOnStartPending = false
+  }
+  return nextState
+}
+
+export async function summarizeOnce(state: BotState): Promise<BotState> {
+  const activeConfig = getConfig()
+  const nextState = await processDailySummary(state, {
+    schedule: {
+      enabled: activeConfig.dailySummaryEnabled,
+      timeZone: activeConfig.dailySummaryTimeZone,
+      hour: activeConfig.dailySummaryHour,
+      minute: activeConfig.dailySummaryMinute,
+      windowHours: activeConfig.dailySummaryWindowHours,
+      deployedAt: activeConfig.vesselDeployedAt,
+    },
+    excludedEventTypes: activeConfig.excludedEventTypes,
+    vesselBaseUrl: activeConfig.vesselBaseUrl,
+    fetchActivities: (options) => fetchAllActivity(activeConfig.indexerUrl, options),
+    fetchStats: () => fetchStats(activeConfig.indexerUrl),
+    send: (payload) => sendWithRetry(activeConfig.discordWebhookUrl, payload),
+    save: (nextState) => writeState(activeConfig.stateFile, nextState),
+  })
+  if (nextState.lastSummaryWindowEnd !== state.lastSummaryWindowEnd) {
+    console.log(`sent daily summary through ${nextState.lastSummaryWindowEnd}`)
   }
   return nextState
 }

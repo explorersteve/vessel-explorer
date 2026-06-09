@@ -25,13 +25,13 @@ export async function processActivities(
 
   if (!state.cursor && options.sendLatestOnStart && activities[0]) {
     await options.send(activities[0])
-    const nextState = { cursor: cursorForActivity(activities[0]) }
+    const nextState = { ...state, cursor: cursorForActivity(activities[0]) }
     await options.save(nextState)
     return nextState
   }
 
   if (!state.cursor && options.startMode === 'latest') {
-    const nextState = { cursor: activities[0] ? cursorForActivity(activities[0]) : null }
+    const nextState = { ...state, cursor: activities[0] ? cursorForActivity(activities[0]) : null }
     await options.save(nextState)
     return nextState
   }
@@ -39,7 +39,7 @@ export async function processActivities(
   const newActivities = newActivitiesSinceCursor(activities, state.cursor)
   if (options.sendLatestOnStart && activities[0] && newActivities.length === 0) {
     await options.send(activities[0])
-    const nextState = { cursor: cursorForActivity(activities[0]) }
+    const nextState = { ...state, cursor: cursorForActivity(activities[0]) }
     await options.save(nextState)
     return nextState
   }
@@ -47,7 +47,7 @@ export async function processActivities(
   let nextState = state
   for (const activity of newActivities) {
     await options.send(activity)
-    nextState = { cursor: cursorForActivity(activity) }
+    nextState = { ...nextState, cursor: cursorForActivity(activity) }
     await options.save(nextState)
   }
 

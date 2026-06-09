@@ -10,6 +10,12 @@ export interface Config {
   stateFile: string
   excludedEventTypes: Set<string>
   sendLatestOnStart: boolean
+  dailySummaryEnabled: boolean
+  dailySummaryTimeZone: string
+  dailySummaryHour: number
+  dailySummaryMinute: number
+  dailySummaryWindowHours: number
+  vesselDeployedAt: Date
 }
 
 const DEFAULT_INDEXER_URL = 'https://indexer.vessel.worldcomputer.art'
@@ -18,6 +24,11 @@ const DEFAULT_ETH_RPC_URL = 'https://ethereum-rpc.publicnode.com'
 const DEFAULT_POLL_INTERVAL_MS = 15_000
 const DEFAULT_STATE_FILE = '/data/state.json'
 const DEFAULT_EXCLUDED_EVENT_TYPES = 'transfer,metadata'
+const DEFAULT_DAILY_SUMMARY_TIMEZONE = 'America/New_York'
+const DEFAULT_DAILY_SUMMARY_HOUR = 15
+const DEFAULT_DAILY_SUMMARY_MINUTE = 0
+const DEFAULT_DAILY_SUMMARY_WINDOW_HOURS = 24
+const DEFAULT_VESSEL_DEPLOYED_AT = '2026-02-24T04:59:35.000Z'
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const discordWebhookUrl = stringEnv(env, 'DISCORD_WEBHOOK_URL')
@@ -40,6 +51,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     stateFile: env.STATE_FILE || DEFAULT_STATE_FILE,
     excludedEventTypes: commaSet(env.EXCLUDED_EVENT_TYPES || DEFAULT_EXCLUDED_EVENT_TYPES),
     sendLatestOnStart: booleanEnv(env, 'SEND_LATEST_ON_START', true),
+    dailySummaryEnabled: booleanEnv(env, 'DAILY_SUMMARY_ENABLED', true),
+    dailySummaryTimeZone: env.DAILY_SUMMARY_TIMEZONE || DEFAULT_DAILY_SUMMARY_TIMEZONE,
+    dailySummaryHour: boundedIntegerEnv(env, 'DAILY_SUMMARY_HOUR', DEFAULT_DAILY_SUMMARY_HOUR, 0, 23),
+    dailySummaryMinute: boundedIntegerEnv(env, 'DAILY_SUMMARY_MINUTE', DEFAULT_DAILY_SUMMARY_MINUTE, 0, 59),
+    dailySummaryWindowHours: positiveIntegerEnv(env, 'DAILY_SUMMARY_WINDOW_HOURS', DEFAULT_DAILY_SUMMARY_WINDOW_HOURS),
+    vesselDeployedAt: dateEnv(env, 'VESSEL_DEPLOYED_AT', DEFAULT_VESSEL_DEPLOYED_AT),
   }
 }
 
@@ -58,6 +75,22 @@ function positiveIntegerEnv(env: NodeJS.ProcessEnv, key: string, fallback: numbe
   return value
 }
 
+function boundedIntegerEnv(
+  env: NodeJS.ProcessEnv,
+  key: string,
+  fallback: number,
+  min: number,
+  max: number,
+) {
+  const raw = env[key]
+  if (!raw) return fallback
+  const value = Number(raw)
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new Error(`${key} must be an integer between ${min} and ${max}`)
+  }
+  return value
+}
+
 function commaSet(value: string) {
   return new Set(
     value
@@ -71,6 +104,14 @@ function booleanEnv(env: NodeJS.ProcessEnv, key: string, fallback: boolean) {
   const value = env[key]?.trim().toLowerCase()
   if (!value) return fallback
   return ['1', 'true', 'yes', 'on'].includes(value)
+}
+
+function dateEnv(env: NodeJS.ProcessEnv, key: string, fallback: string) {
+  const value = new Date(env[key] || fallback)
+  if (Number.isNaN(value.getTime())) {
+    throw new Error(`${key} must be a valid ISO date`)
+  }
+  return value
 }
 
 function trimTrailingSlash(value: string) {

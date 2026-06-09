@@ -3,9 +3,10 @@ import type { VesselActivity } from './types.js'
 export interface DiscordEmbedPayload {
   embeds: Array<{
     title: string
-    description: string
-    url: string
-    image: { url: string }
+    description?: string
+    url?: string
+    fields?: Array<{ name: string, value: string }>
+    image?: { url: string }
   }>
 }
 

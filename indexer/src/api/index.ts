@@ -514,6 +514,8 @@ function activityFilters(c: { req: { query: (key: string) => string | undefined 
   const tokenId = c.req.query('tokenId') || c.req.query('id')
   const address = (c.req.query('address') || '').trim()
   const type = c.req.query('type')
+  const startTime = c.req.query('startTime')
+  const endTime = c.req.query('endTime')
 
   if (tokenId && /^\d+$/.test(tokenId)) {
     conds.push(sql`${activityEvent}.token_id = ${BigInt(tokenId)}`)
@@ -528,6 +530,12 @@ function activityFilters(c: { req: { query: (key: string) => string | undefined 
     )`)
   }
   if (type) conds.push(sql`${activityEvent}.type = ${type}`)
+  if (startTime && /^\d+$/.test(startTime)) {
+    conds.push(sql`${activityEvent}.timestamp >= ${BigInt(startTime)}`)
+  }
+  if (endTime && /^\d+$/.test(endTime)) {
+    conds.push(sql`${activityEvent}.timestamp < ${BigInt(endTime)}`)
+  }
 
   return conds
 }

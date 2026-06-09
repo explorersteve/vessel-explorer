@@ -6,9 +6,12 @@ export async function readState(path: string): Promise<BotState> {
   try {
     const raw = await readFile(path, 'utf8')
     const parsed = JSON.parse(raw) as Partial<BotState>
-    return { cursor: normalizeCursor(parsed.cursor) }
+    return {
+      cursor: normalizeCursor(parsed.cursor),
+      lastSummaryWindowEnd: normalizeSummaryWindowEnd(parsed.lastSummaryWindowEnd),
+    }
   } catch (error) {
-    if (isNotFound(error)) return { cursor: null }
+    if (isNotFound(error)) return { cursor: null, lastSummaryWindowEnd: null }
     throw error
   }
 }
@@ -29,6 +32,11 @@ function normalizeCursor(value: unknown): ActivityCursor | null {
   const vesselId = stringField(row.vesselId)
   if (!blockNumber || !hash || !action || !vesselId) return null
   return { blockNumber, hash, action, vesselId }
+}
+
+function normalizeSummaryWindowEnd(value: unknown) {
+  const number = Number(value)
+  return Number.isFinite(number) && number > 0 ? Math.floor(number) : null
 }
 
 function stringField(value: unknown) {
