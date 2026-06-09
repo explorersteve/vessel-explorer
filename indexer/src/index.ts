@@ -7,6 +7,7 @@ import {
   operatorApproval,
   payloadWrite,
   protocol,
+  seaportSale,
   token,
   transfer,
   vesselEntry,
@@ -23,6 +24,7 @@ import {
 
 import { VesselAbi } from '../abis/VesselAbi'
 import { INDEXER_START_BLOCK, VESSEL_ADDRESS, VESSEL_START_BLOCK } from '../ponder.config'
+import { findSeaportSaleForTransfer, type SeaportSaleMatch } from './seaport'
 
 type Address = `0x${string}`
 type PonderEvent = {
@@ -170,12 +172,53 @@ ponder.on('Vessel:Transfer', async ({ event, context }) => {
       })
   }
 
+  const sale = isClaim
+    ? null
+    : await findSaleForTransfer(context, event, tokenId, from, to)
+  if (sale) {
+    await context.db
+      .insert(seaportSale)
+      .values({
+        activity_id: eventId(event),
+        tx_hash: meta.tx_hash,
+        transfer_log_index: meta.log_index,
+        block_number: meta.block_number,
+        token_id: tokenId,
+        seaport_address: sale.seaportAddress,
+        seaport_log_index: sale.seaportLogIndex,
+        order_hash: sale.orderHash,
+        buyer: sale.buyer,
+        seller: sale.seller,
+        payment_token: sale.paymentToken,
+        payment_symbol: sale.paymentSymbol,
+        payment_decimals: sale.paymentDecimals,
+        payment_amount_raw: sale.paymentAmountRaw?.toString() ?? null,
+        timestamp: meta.timestamp,
+      })
+      .onConflictDoUpdate({
+        tx_hash: meta.tx_hash,
+        transfer_log_index: meta.log_index,
+        block_number: meta.block_number,
+        token_id: tokenId,
+        seaport_address: sale.seaportAddress,
+        seaport_log_index: sale.seaportLogIndex,
+        order_hash: sale.orderHash,
+        buyer: sale.buyer,
+        seller: sale.seller,
+        payment_token: sale.paymentToken,
+        payment_symbol: sale.paymentSymbol,
+        payment_decimals: sale.paymentDecimals,
+        payment_amount_raw: sale.paymentAmountRaw?.toString() ?? null,
+        timestamp: meta.timestamp,
+      })
+  }
+
   await insertActivity(context, {
     id: eventId(event),
-    type: isClaim ? 'claim' : 'transfer',
-    source_event: 'Transfer',
+    type: isClaim ? 'claim' : sale ? 'sale' : 'transfer',
+    source_event: sale ? 'OrderFulfilled' : 'Transfer',
     token_id: tokenId,
-    actor: isClaim ? to : from,
+    actor: isClaim ? to : sale ? sale.buyer : from,
     from,
     to,
     ...meta,
@@ -381,6 +424,31 @@ async function recoverPayloadSetsFromReceipt(context: Context, event: PonderEven
       log: { logIndex },
       transaction: event.transaction,
     })
+  }
+}
+
+async function findSaleForTransfer(
+  context: Context,
+  event: PonderEvent,
+  tokenId: bigint,
+  seller: Address,
+  buyer: Address,
+): Promise<SeaportSaleMatch | null> {
+  try {
+    const receipt = await context.client.getTransactionReceipt({ hash: event.transaction.hash })
+    return findSeaportSaleForTransfer(receipt.logs, {
+      vesselAddress: VESSEL_ADDRESS,
+      tokenId,
+      seller,
+      buyer,
+    })
+  } catch (error) {
+    console.warn('Seaport sale receipt parsing failed', {
+      txHash: event.transaction.hash,
+      tokenId: tokenId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return null
   }
 }
 

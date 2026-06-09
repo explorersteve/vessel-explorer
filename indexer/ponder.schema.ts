@@ -123,6 +123,42 @@ export const transfer = onchainTable(
   }),
 )
 
+export const seaportSale = onchainTable(
+  'seaport_sales',
+  (t) => ({
+    activity_id: t.text().primaryKey(),
+    tx_hash: t.hex().notNull(),
+    transfer_log_index: t.integer().notNull(),
+    block_number: t.bigint().notNull(),
+    token_id: t.bigint().notNull(),
+    seaport_address: t.hex().notNull(),
+    seaport_log_index: t.integer().notNull(),
+    order_hash: t.hex().notNull(),
+    buyer: t.hex().notNull(),
+    seller: t.hex().notNull(),
+    payment_token: t.hex(),
+    payment_symbol: t.text().notNull(),
+    payment_decimals: t.integer(),
+    payment_amount_raw: t.text(),
+    timestamp: t.bigint().notNull(),
+  }),
+  (table) => ({
+    txIdx: index('seaport_sale_tx_idx').on(table.tx_hash),
+    tokenTimestampIdx: index('seaport_sale_token_timestamp_idx').on(
+      table.token_id,
+      table.timestamp,
+    ),
+    buyerTimestampIdx: index('seaport_sale_buyer_timestamp_idx').on(
+      table.buyer,
+      table.timestamp,
+    ),
+    sellerTimestampIdx: index('seaport_sale_seller_timestamp_idx').on(
+      table.seller,
+      table.timestamp,
+    ),
+  }),
+)
+
 export const activityEvent = onchainTable(
   'activity_events',
   (t) => ({
