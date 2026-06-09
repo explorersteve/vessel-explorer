@@ -1,5 +1,6 @@
 export interface VesselTransaction {
   hash: string
+  actor?: string | null
   from: string
   to: string
   timeStamp: string
@@ -9,6 +10,15 @@ export interface VesselTransaction {
   functionName: string
   action: string
   vesselId: string | null
+  buyer?: string | null
+  seller?: string | null
+  salePrice?: {
+    amountRaw: string | null
+    decimals: number | null
+    symbol: string
+    token: string | null
+    formatted: string
+  }
   detail: string
 }
 
@@ -34,6 +44,7 @@ export async function fetchVesselActivity(page = 1, offset = 50): Promise<Vessel
 
   return txs.map((tx: any) => ({
     hash: tx.hash,
+    actor: tx.actor ?? null,
     from: tx.from,
     to: tx.to,
     timeStamp: tx.timeStamp,
@@ -43,8 +54,22 @@ export async function fetchVesselActivity(page = 1, offset = 50): Promise<Vessel
     functionName: tx.functionName ?? '',
     action: tx.action ?? tx._action ?? 'unknown',
     vesselId: tx.vesselId ?? tx._vesselId ?? null,
+    buyer: tx.buyer ?? null,
+    seller: tx.seller ?? null,
+    salePrice: normalizeSalePrice(tx.salePrice),
     detail: tx.detail ?? tx._detail ?? tx.action ?? 'unknown',
   }))
+}
+
+function normalizeSalePrice(value: any): VesselTransaction['salePrice'] {
+  if (!value || typeof value !== 'object') return undefined
+  return {
+    amountRaw: value.amountRaw == null ? null : String(value.amountRaw),
+    decimals: value.decimals == null ? null : Number(value.decimals),
+    symbol: String(value.symbol || 'MIXED'),
+    token: value.token == null ? null : String(value.token),
+    formatted: String(value.formatted || 'mixed payment'),
+  }
 }
 
 export async function fetchDailyActivity(): Promise<DailyActivityResponse> {

@@ -111,7 +111,17 @@
               <span v-else class="text-faint">--</span>
             </span>
             <span class="col-from">
-              <AddressDisplay :address="tx.from" />
+              <template v-if="tx.action === 'sale'">
+                <span class="sale-parties">
+                  <AddressDisplay :address="tx.buyer || tx.from" />
+                  <span class="sale-separator">from</span>
+                  <AddressDisplay :address="tx.seller || tx.to" />
+                </span>
+              </template>
+              <AddressDisplay v-else :address="tx.from" />
+            </span>
+            <span class="col-price">
+              {{ tx.action === 'sale' ? tx.salePrice?.formatted || 'mixed payment' : '' }}
             </span>
             <a
               :href="`${EXPLORER_BASE}/tx/${tx.hash}`"
@@ -159,7 +169,7 @@ const feedExhausted = ref(false)
 const sentinel = ref<HTMLElement | null>(null)
 const previewCanvas = ref<HTMLCanvasElement | null>(null)
 
-const actionTypes = ['claim', 'write', 'transfer', 'machine', 'delegate', 'setvaultentry'] as const
+const actionTypes = ['claim', 'sale', 'write', 'transfer', 'machine', 'delegate', 'setvaultentry'] as const
 const activeFilters = ref(new Set<string>(actionTypes))
 const ACTIVITY_REFRESH_MS = 15_000
 
@@ -362,7 +372,7 @@ function renderPreview(data: Uint8Array, tokenId: number, colorMode: ColorMode =
   renderToCanvas(canvas, data, tokenId, 80, colorMode)
 }
 
-const showActions = new Set(['claim', 'transfer', 'write', 'machine', 'delegate', 'setvaultentry'])
+const showActions = new Set(['claim', 'sale', 'transfer', 'write', 'machine', 'delegate', 'setvaultentry'])
 
 function activityKey(tx: VesselTransaction) {
   return `${tx.hash}-${tx.action}-${tx.vesselId ?? ''}-${tx.blockNumber}`
@@ -606,7 +616,7 @@ onMounted(async () => {
 
 .feed-row {
   display: grid;
-  grid-template-columns: 5.5rem 4.5rem 1fr 5rem;
+  grid-template-columns: 5.5rem 4.5rem minmax(0, 1fr) 6.75rem 5rem;
   gap: 0.5rem;
   padding: 0.35rem 0.25rem;
   border-bottom: 1px solid var(--border-color);
@@ -639,6 +649,31 @@ onMounted(async () => {
   text-align: right;
 }
 
+.col-price {
+  color: var(--color);
+  font-size: 12px;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+}
+
+.sale-parties {
+  display: flex;
+  gap: 0.35rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sale-parties :deep(.address-display) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sale-separator {
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
 .vessel-id-cell {
   position: relative;
 }
@@ -662,6 +697,7 @@ onMounted(async () => {
 .action-delegate { color: #60a5fa; background: rgba(96, 165, 250, 0.2); }
 .action-machine { color: var(--color-machine); background: rgba(167, 139, 250, 0.2); }
 .action-transfer { color: var(--muted); background: rgba(128, 128, 128, 0.15); }
+.action-sale { color: #34d399; background: rgba(52, 211, 153, 0.18); }
 .action-role { color: #f472b6; background: rgba(244, 114, 182, 0.2); }
 .action-setvaultentry { color: var(--color-vault); background: rgba(74, 222, 128, 0.2); }
 
@@ -705,8 +741,12 @@ onMounted(async () => {
 
 @media (max-width: 640px) {
   .feed-row {
-    grid-template-columns: 5rem 3.5rem 1fr 4rem;
+    grid-template-columns: 4.5rem 3.25rem minmax(0, 1fr) 4.25rem;
     font-size: 12px;
+  }
+
+  .col-price {
+    display: none;
   }
 }
 </style>
