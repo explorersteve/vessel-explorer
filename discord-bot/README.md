@@ -37,6 +37,7 @@ DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/... pnpm start
 
 - `INDEXER_URL=https://indexer.vessel.worldcomputer.art`
 - `VESSEL_BASE_URL=https://vessel.worldcomputer.art`
+- `ETH_RPC_URL=https://ethereum-rpc.publicnode.com`
 - `POLL_INTERVAL_MS=15000`
 - `START_MODE=latest`
 - `STATE_FILE=/data/state.json`

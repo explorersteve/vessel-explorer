@@ -4,6 +4,7 @@ export interface Config {
   discordWebhookUrl: string
   indexerUrl: string
   vesselBaseUrl: string
+  ethRpcUrl: string
   pollIntervalMs: number
   startMode: StartMode
   stateFile: string
@@ -12,6 +13,7 @@ export interface Config {
 
 const DEFAULT_INDEXER_URL = 'https://indexer.vessel.worldcomputer.art'
 const DEFAULT_VESSEL_BASE_URL = 'https://vessel.worldcomputer.art'
+const DEFAULT_ETH_RPC_URL = 'https://ethereum-rpc.publicnode.com'
 const DEFAULT_POLL_INTERVAL_MS = 15_000
 const DEFAULT_STATE_FILE = '/data/state.json'
 const DEFAULT_EXCLUDED_EVENT_TYPES = 'transfer,metadata'
@@ -31,6 +33,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     discordWebhookUrl,
     indexerUrl: trimTrailingSlash(env.INDEXER_URL || DEFAULT_INDEXER_URL),
     vesselBaseUrl: trimTrailingSlash(env.VESSEL_BASE_URL || DEFAULT_VESSEL_BASE_URL),
+    ethRpcUrl: env.ETH_RPC_URL || DEFAULT_ETH_RPC_URL,
     pollIntervalMs: positiveIntegerEnv(env, 'POLL_INTERVAL_MS', DEFAULT_POLL_INTERVAL_MS),
     startMode,
     stateFile: env.STATE_FILE || DEFAULT_STATE_FILE,

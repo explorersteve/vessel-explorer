@@ -26,6 +26,7 @@ env:
   clear:
     INDEXER_URL: '<%= ENV["INDEXER_URL"] || "https://indexer.vessel.worldcomputer.art" %>'
     VESSEL_BASE_URL: '<%= ENV["VESSEL_BASE_URL"] || "https://vessel.worldcomputer.art" %>'
+    ETH_RPC_URL: '<%= ENV["ETH_RPC_URL"] || "https://ethereum-rpc.publicnode.com" %>'
     POLL_INTERVAL_MS: '<%= ENV["POLL_INTERVAL_MS"] || "15000" %>'
     START_MODE: '<%= ENV["START_MODE"] || "latest" %>'
     STATE_FILE: '<%= ENV["STATE_FILE"] || "/data/state.json" %>'

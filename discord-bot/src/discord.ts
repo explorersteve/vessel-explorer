@@ -11,18 +11,19 @@ export interface DiscordEmbedPayload {
 export function buildDiscordPayload(
   activity: VesselActivity,
   vesselBaseUrl: string,
+  actor: string = shortenAddress(activity.from),
 ): DiscordEmbedPayload {
   if (!activity.vesselId) {
     throw new Error('cannot build Discord payload for activity without vesselId')
   }
 
   const vesselUrl = `${vesselBaseUrl}/${activity.vesselId}`
-  const imageUrl = `${vesselBaseUrl}/api/og/${activity.vesselId}`
+  const imageUrl = `${vesselBaseUrl}/api/og/${activity.vesselId}?v=${imageVersion(activity)}`
 
   return {
     embeds: [
       {
-        description: `${sentenceForActivity(activity)}\n${vesselUrl}`,
+        description: `${sentenceForActivity(activity, actor)}\n${vesselUrl}`,
         url: vesselUrl,
         image: { url: imageUrl },
       },
@@ -66,12 +67,11 @@ export async function sendWithRetry(
   throw lastError
 }
 
-export function sentenceForActivity(activity: VesselActivity) {
+export function sentenceForActivity(activity: VesselActivity, actor = shortenAddress(activity.from)) {
   if (!activity.vesselId) {
     throw new Error('cannot format activity without vesselId')
   }
 
-  const actor = shortenAddress(activity.from)
   const action = activitySentenceFragment(activity)
   return `${actor} ${action} on #${activity.vesselId}`
 }
@@ -103,7 +103,7 @@ function activitySentenceFragment(activity: VesselActivity) {
 
 function entryFragment(detail: string) {
   const entry = detail.match(/entry\s+(\d+)/i)?.[1]
-  return entry ? `set entry ${entry}` : 'set vault entry'
+  return entry ? `set vault entry ${entry}` : 'set vault entry'
 }
 
 function roleFragment(detail: string) {
@@ -118,4 +118,13 @@ export function shortenAddress(address: string) {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function imageVersion(activity: VesselActivity) {
+  return encodeURIComponent([
+    activity.blockNumber,
+    activity.action,
+    activity.vesselId,
+    activity.timeStamp,
+  ].join('-'))
 }

@@ -2,12 +2,14 @@ import { pathToFileURL } from 'node:url'
 import { loadConfig } from './config.js'
 import { processActivities } from './bot.js'
 import { buildDiscordPayload, sendWithRetry } from './discord.js'
+import { createEnsResolver, type EnsResolver } from './ens.js'
 import { fetchActivity } from './indexer.js'
 import { readState, writeState } from './state.js'
 import type { Config } from './config.js'
 import type { BotState, VesselActivity } from './types.js'
 
 let config: Config | null = null
+let ensResolver: EnsResolver | null = null
 
 let shuttingDown = false
 process.on('SIGINT', () => {
@@ -51,7 +53,8 @@ export async function pollOnce(state: BotState): Promise<BotState> {
 
 async function sendActivity(activity: VesselActivity) {
   const activeConfig = getConfig()
-  const payload = buildDiscordPayload(activity, activeConfig.vesselBaseUrl)
+  const actor = await getEnsResolver().displayName(activity.from)
+  const payload = buildDiscordPayload(activity, activeConfig.vesselBaseUrl, actor)
   await sendWithRetry(activeConfig.discordWebhookUrl, payload)
   console.log(`sent ${activity.action} #${activity.vesselId} ${activity.hash}`)
 }
@@ -59,6 +62,11 @@ async function sendActivity(activity: VesselActivity) {
 function getConfig() {
   config ??= loadConfig()
   return config
+}
+
+function getEnsResolver() {
+  ensResolver ??= createEnsResolver(getConfig().ethRpcUrl)
+  return ensResolver
 }
 
 function isEntrypoint() {
