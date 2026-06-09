@@ -1,0 +1,121 @@
+import type { VesselActivity } from './types.js'
+
+export interface DiscordEmbedPayload {
+  embeds: Array<{
+    description: string
+    url: string
+    image: { url: string }
+  }>
+}
+
+export function buildDiscordPayload(
+  activity: VesselActivity,
+  vesselBaseUrl: string,
+): DiscordEmbedPayload {
+  if (!activity.vesselId) {
+    throw new Error('cannot build Discord payload for activity without vesselId')
+  }
+
+  const vesselUrl = `${vesselBaseUrl}/${activity.vesselId}`
+  const imageUrl = `${vesselBaseUrl}/api/og/${activity.vesselId}`
+
+  return {
+    embeds: [
+      {
+        description: `${sentenceForActivity(activity)}\n${vesselUrl}`,
+        url: vesselUrl,
+        image: { url: imageUrl },
+      },
+    ],
+  }
+}
+
+export async function sendDiscordWebhook(
+  webhookUrl: string,
+  payload: DiscordEmbedPayload,
+) {
+  const response = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    throw new Error(`Discord webhook failed: ${response.status} ${response.statusText} ${body}`.trim())
+  }
+}
+
+export async function sendWithRetry(
+  webhookUrl: string,
+  payload: DiscordEmbedPayload,
+  maxAttempts = 3,
+) {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await sendDiscordWebhook(webhookUrl, payload)
+      return
+    } catch (error) {
+      lastError = error
+      if (attempt < maxAttempts) {
+        await sleep(500 * 2 ** (attempt - 1))
+      }
+    }
+  }
+  throw lastError
+}
+
+export function sentenceForActivity(activity: VesselActivity) {
+  if (!activity.vesselId) {
+    throw new Error('cannot format activity without vesselId')
+  }
+
+  const actor = shortenAddress(activity.from)
+  const action = activitySentenceFragment(activity)
+  return `${actor} ${action} on #${activity.vesselId}`
+}
+
+function activitySentenceFragment(activity: VesselActivity) {
+  switch (activity.action.toLowerCase()) {
+    case 'claim':
+      return 'claimed'
+    case 'write':
+      return `wrote ${Number(activity.detail.match(/[\d,]+(?= bytes)/)?.[0]?.replace(/,/g, '') || 0).toLocaleString()} bytes`
+    case 'machine':
+      return 'set machine'
+    case 'delegate':
+      return 'set delegate'
+    case 'setvaultentry':
+      return entryFragment(activity.detail)
+    case 'approval':
+      return 'approved'
+    case 'approvalforall':
+      return 'set approval for all'
+    case 'role':
+      return roleFragment(activity.detail)
+    case 'lock':
+      return 'started lock clock'
+    default:
+      return activity.detail.replace(/\s+#?\d+\s*$/, '').trim() || activity.action
+  }
+}
+
+function entryFragment(detail: string) {
+  const entry = detail.match(/entry\s+(\d+)/i)?.[1]
+  return entry ? `set entry ${entry}` : 'set vault entry'
+}
+
+function roleFragment(detail: string) {
+  const role = detail.match(/role\s+(\d+)/i)?.[1]
+  return role ? `set role ${role}` : 'set role'
+}
+
+export function shortenAddress(address: string) {
+  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) return address || 'unknown'
+  return `${address.slice(0, 6)}...${address.slice(-4)}`
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}

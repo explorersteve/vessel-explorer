@@ -1,0 +1,40 @@
+service: vessel-discord-bot
+
+primary_role: bot
+
+image: <%= ENV["DOCKER_REGISTRY_USERNAME"] %>/vessel-discord-bot
+
+servers:
+  bot:
+    hosts:
+      - <%= ENV["DEPLOY_HOST"] %>
+    proxy: false
+    options:
+      network: shared
+
+registry:
+  username: <%= ENV["DOCKER_REGISTRY_USERNAME"] %>
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+builder:
+  arch: amd64
+  context: ..
+  dockerfile: ../Dockerfile.discord-bot
+
+env:
+  clear:
+    INDEXER_URL: '<%= ENV["INDEXER_URL"] || "https://indexer.vessel.worldcomputer.art" %>'
+    VESSEL_BASE_URL: '<%= ENV["VESSEL_BASE_URL"] || "https://vessel.worldcomputer.art" %>'
+    POLL_INTERVAL_MS: '<%= ENV["POLL_INTERVAL_MS"] || "15000" %>'
+    START_MODE: '<%= ENV["START_MODE"] || "latest" %>'
+    STATE_FILE: '<%= ENV["STATE_FILE"] || "/data/state.json" %>'
+    EXCLUDED_EVENT_TYPES: '<%= ENV["EXCLUDED_EVENT_TYPES"] || "transfer,metadata" %>'
+  secret:
+    - DISCORD_WEBHOOK_URL
+
+volumes:
+  - /home/deploy/vessel-discord-bot/data:/data
+
+ssh:
+  user: deploy
