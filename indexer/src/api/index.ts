@@ -268,10 +268,18 @@ app.get('/activity', async (c) => {
   const whereClause = andClause(conds)
 
   const result = await db.execute(sql`
-    SELECT *
+    SELECT
+      ${activityEvent}.*,
+      ${payloadWrite}.entry_index AS write_entry_index
     FROM ${activityEvent}
+    LEFT JOIN ${payloadWrite}
+      ON ${activityEvent}.type = 'write'
+      AND ${payloadWrite}.token_id = ${activityEvent}.token_id
+      AND ${payloadWrite}.tx_hash = ${activityEvent}.tx_hash
+      AND ${payloadWrite}.block_number = ${activityEvent}.block_number
+      AND ${payloadWrite}.log_index = ${activityEvent}.log_index
     WHERE ${whereClause}
-    ORDER BY timestamp DESC, block_number DESC, log_index DESC
+    ORDER BY ${activityEvent}.timestamp DESC, ${activityEvent}.block_number DESC, ${activityEvent}.log_index DESC
     LIMIT ${limit} OFFSET ${offset}
   `)
 
@@ -575,6 +583,7 @@ function activityToExplorerTx(row: Row) {
     functionName: functionNameForActivity(action),
     action,
     vesselId: tokenId,
+    entry: row.entry == null && row.write_entry_index != null ? Number(row.write_entry_index) : row.entry == null ? null : Number(row.entry),
     detail: detailForActivity(action, tokenId, row),
     _action: action,
     _vesselId: tokenId,
@@ -611,7 +620,7 @@ function detailForActivity(action: string, tokenId: string | null, row: Row) {
     case 'claim':
       return `claimed${suffix}`
     case 'write':
-      return `wrote ${Number(row.payload_bytes ?? 0).toLocaleString()} bytes to${suffix}`
+      return writeDetail(row, suffix)
     case 'delegate':
       return `delegated${suffix}`
     case 'machine':
@@ -629,6 +638,13 @@ function detailForActivity(action: string, tokenId: string | null, row: Row) {
     default:
       return action
   }
+}
+
+function writeDetail(row: Row, suffix: string) {
+  const bytes = Number(row.payload_bytes ?? 0).toLocaleString()
+  const entry = row.entry == null && row.write_entry_index != null ? row.write_entry_index : row.entry
+  const entryText = entry == null ? '' : ` to entry ${Number(entry)}`
+  return `wrote ${bytes} bytes${entryText} to${suffix}`
 }
 
 function stringify(value: unknown) {

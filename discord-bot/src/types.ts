@@ -9,6 +9,7 @@ export interface VesselActivity {
   functionName: string
   action: string
   vesselId: string | null
+  entry: number | null
   detail: string
 }
 

@@ -84,6 +84,7 @@ function normalizeActivity(value: unknown): VesselActivity | null {
     functionName: stringField(row.functionName),
     action,
     vesselId: nullableString(row.vesselId ?? row._vesselId),
+    entry: numberField(row.entry),
     detail: stringField(row.detail ?? row._detail),
   }
 }
@@ -95,4 +96,10 @@ function stringField(value: unknown) {
 function nullableString(value: unknown) {
   const text = stringField(value)
   return text || null
+}
+
+function numberField(value: unknown) {
+  if (value == null || value === '') return null
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
 }

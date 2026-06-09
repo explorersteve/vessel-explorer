@@ -332,6 +332,7 @@ async function handlePayloadSet(context: Context, event: PonderEvent) {
     source_event: 'PayloadSet',
     token_id: tokenId,
     actor,
+    entry: entryIndex,
     payload_bytes: payloadBytes,
     ...eventMeta(event),
   })

@@ -23,7 +23,7 @@ export function buildDiscordPayload(
   return {
     embeds: [
       {
-        description: `${sentenceForActivity(activity, actor)}\n${vesselUrl}`,
+        description: `${sentenceForActivity(activity, actor)}\n\n${vesselUrl}`,
         url: vesselUrl,
         image: { url: imageUrl },
       },
@@ -81,7 +81,7 @@ function activitySentenceFragment(activity: VesselActivity) {
     case 'claim':
       return 'claimed'
     case 'write':
-      return `wrote ${Number(activity.detail.match(/[\d,]+(?= bytes)/)?.[0]?.replace(/,/g, '') || 0).toLocaleString()} bytes`
+      return writeFragment(activity)
     case 'machine':
       return 'set machine'
     case 'delegate':
@@ -104,6 +104,13 @@ function activitySentenceFragment(activity: VesselActivity) {
 function entryFragment(detail: string) {
   const entry = detail.match(/entry\s+(\d+)/i)?.[1]
   return entry ? `set vault entry ${entry}` : 'set vault entry'
+}
+
+function writeFragment(activity: VesselActivity) {
+  const bytes = Number(activity.detail.match(/[\d,]+(?= bytes)/)?.[0]?.replace(/,/g, '') || 0).toLocaleString()
+  const entry = activity.entry ?? activity.detail.match(/entry\s+(\d+)/i)?.[1] ?? null
+  const entryText = entry === null ? '' : ` to entry ${entry}`
+  return `wrote ${bytes} bytes${entryText}`
 }
 
 function roleFragment(detail: string) {

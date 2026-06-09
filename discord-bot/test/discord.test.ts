@@ -6,6 +6,7 @@ import type { VesselActivity } from '../src/types.js'
 test('formats minimal activity sentences', () => {
   assert.equal(sentenceForActivity(activity({ action: 'claim', detail: 'claimed #728' })), '0xabc1...def2 claimed on #2623')
   assert.equal(sentenceForActivity(activity({ action: 'write', detail: 'wrote 2,623 bytes to #2623' })), '0xabc1...def2 wrote 2,623 bytes on #2623')
+  assert.equal(sentenceForActivity(activity({ action: 'write', entry: 3 })), '0xabc1...def2 wrote 2,623 bytes to entry 3 on #2623')
   assert.equal(sentenceForActivity(activity({ action: 'machine', detail: 'set machine on #5134', vesselId: '5134' })), '0xabc1...def2 set machine on #5134')
   assert.equal(sentenceForActivity(activity({ action: 'delegate', detail: 'delegated #2623' })), '0xabc1...def2 set delegate on #2623')
   assert.equal(sentenceForActivity(activity({ action: 'setvaultentry', detail: 'set entry 3 on #2623' })), '0xabc1...def2 set vault entry 3 on #2623')
@@ -17,6 +18,7 @@ test('builds Discord embed with vessel link and OG image', () => {
 
   assert.equal(payload.embeds[0]?.url, 'https://vessel.worldcomputer.art/5134')
   assert.equal(payload.embeds[0]?.image.url, 'https://vessel.worldcomputer.art/api/og/5134?v=25274501-machine-5134-1780943435')
+  assert.match(payload.embeds[0]?.description || '', /\n\nhttps:\/\/vessel\.worldcomputer\.art\/5134/)
   assert.match(payload.embeds[0]?.description || '', /https:\/\/vessel\.worldcomputer\.art\/5134/)
 })
 
@@ -32,6 +34,7 @@ function activity(overrides: Partial<VesselActivity> = {}): VesselActivity {
     functionName: '',
     action: 'write',
     vesselId: '2623',
+    entry: null,
     detail: 'wrote 2,623 bytes to #2623',
     ...overrides,
   }

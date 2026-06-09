@@ -179,6 +179,7 @@ function activity(overrides: Partial<VesselActivity> = {}): VesselActivity {
     functionName: '',
     action: 'write',
     vesselId: '2623',
+    entry: null,
     detail: 'wrote 2,623 bytes to #2623',
     ...overrides,
   }
