@@ -1,4 +1,21 @@
 import { deflateSync } from 'node:zlib'
+import type { H3Event } from 'h3'
+import { createPublicClient, http, type Hex } from 'viem'
+import { mainnet } from 'viem/chains'
+
+const VESSEL_ADDRESS = '0xECb92Cc7112b80A2234936315BbB493fb48d1463'
+const VESSEL_PAYLOAD_ABI = [
+  {
+    type: 'function',
+    name: 'craftToPayload',
+    inputs: [{ name: '_tokenId', type: 'uint256' }],
+    outputs: [{ name: 'payload', type: 'bytes' }],
+    stateMutability: 'view',
+  },
+] as const
+
+let clientRpcUrl = ''
+let client: ReturnType<typeof createPublicClient> | null = null
 
 function getGridDimensions(tokenId: number) {
   const cols = Math.ceil(Math.sqrt(tokenId))
@@ -99,6 +116,42 @@ function buildPng(pixels: Uint8Array, width: number, height: number, scale: numb
   ])
 }
 
+function machineRpcUrl(event: H3Event) {
+  const config = useRuntimeConfig(event)
+  const publicConfig = config.public as {
+    machineRpcUrl?: unknown
+    evm?: { chains?: { mainnet?: { rpcs?: unknown } } }
+  }
+  return String(
+    publicConfig.machineRpcUrl
+      || publicConfig.evm?.chains?.mainnet?.rpcs
+      || 'https://ethereum-rpc.publicnode.com',
+  )
+}
+
+function getClient(event: H3Event) {
+  const rpcUrl = machineRpcUrl(event)
+  if (!client || clientRpcUrl !== rpcUrl) {
+    clientRpcUrl = rpcUrl
+    client = createPublicClient({
+      chain: mainnet,
+      transport: http(rpcUrl),
+    })
+  }
+  return client
+}
+
+async function liveMachinePayload(event: H3Event, tokenId: number) {
+  const payload = await getClient(event).readContract({
+    address: VESSEL_ADDRESS,
+    abi: VESSEL_PAYLOAD_ABI,
+    functionName: 'craftToPayload',
+    args: [BigInt(tokenId)],
+  }).catch(() => null)
+
+  return typeof payload === 'string' ? payload as Hex : null
+}
+
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id || isNaN(Number(id))) {
@@ -113,14 +166,17 @@ export default defineEventHandler(async (event) => {
 
   try {
     const token = await fetchIndexerJson(`/tokens/${tokenId}`)
-    const pixels = hexToBytes(String(token.payloadHex || '0x'))
+    const livePayload = token.isMachine
+      ? await liveMachinePayload(event, tokenId)
+      : null
+    const pixels = hexToBytes(String(livePayload || token.payloadHex || '0x'))
     const colorMode = Number(token.colorMode || 0)
 
     const png = buildPng(pixels, cols, rows, scale, colorMode)
 
     setResponseHeaders(event, {
       'Content-Type': 'image/png',
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': `public, max-age=${token.isMachine ? 60 : 3600}`,
     })
 
     return png
