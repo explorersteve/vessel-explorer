@@ -14,6 +14,9 @@ importers:
       hono:
         specifier: ^4.12.22
         version: 4.12.22
+      pg:
+        specifier: 8.21.0
+        version: 8.21.0
       ponder:
         specifier: ^0.16.6
         version: 0.16.6(@opentelemetry/api@1.9.1)(@types/node@20.19.41)(hono@4.12.22)(typescript@5.9.3)(viem@2.50.4(typescript@5.9.3))

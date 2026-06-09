@@ -7,6 +7,7 @@
     "dev": "ponder dev",
     "start": "ponder start",
     "serve": "ponder serve",
+    "backfill:sales": "node scripts/backfill-sales.mjs",
     "db": "ponder db",
     "codegen": "ponder codegen",
     "typecheck": "tsc",
@@ -17,6 +18,7 @@
   "dependencies": {
     "@ponder/utils": "^0.2.18",
     "hono": "^4.12.22",
+    "pg": "8.21.0",
     "ponder": "^0.16.6",
     "viem": "^2.47.0"
   },
