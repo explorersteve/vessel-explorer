@@ -84,6 +84,7 @@ function normalizeActivity(value: unknown): VesselActivity | null {
     functionName: stringField(row.functionName),
     action,
     vesselId: nullableString(row.vesselId ?? row._vesselId),
+    craftType: nullableString(row.craftType ?? row._craftType),
     entry: numberField(row.entry),
     detail: stringField(row.detail ?? row._detail),
   }

@@ -270,8 +270,11 @@ app.get('/activity', async (c) => {
   const result = await db.execute(sql`
     SELECT
       ${activityEvent}.*,
-      ${payloadWrite}.entry_index AS write_entry_index
+      ${payloadWrite}.entry_index AS write_entry_index,
+      ${token}.vessel_type AS craft_type
     FROM ${activityEvent}
+    LEFT JOIN ${token}
+      ON ${token}.token_id = ${activityEvent}.token_id
     LEFT JOIN ${payloadWrite}
       ON ${activityEvent}.type = 'write'
       AND ${payloadWrite}.token_id = ${activityEvent}.token_id
@@ -513,18 +516,18 @@ function activityFilters(c: { req: { query: (key: string) => string | undefined 
   const type = c.req.query('type')
 
   if (tokenId && /^\d+$/.test(tokenId)) {
-    conds.push(sql`token_id = ${BigInt(tokenId)}`)
+    conds.push(sql`${activityEvent}.token_id = ${BigInt(tokenId)}`)
   }
   if (ADDRESS_PATTERN.test(address)) {
     conds.push(sql`(
-      lower(actor) = lower(${address})
-      OR lower("from") = lower(${address})
-      OR lower("to") = lower(${address})
-      OR lower(delegate) = lower(${address})
-      OR lower(machine) = lower(${address})
+      lower(${activityEvent}.actor) = lower(${address})
+      OR lower(${activityEvent}."from") = lower(${address})
+      OR lower(${activityEvent}."to") = lower(${address})
+      OR lower(${activityEvent}.delegate) = lower(${address})
+      OR lower(${activityEvent}.machine) = lower(${address})
     )`)
   }
-  if (type) conds.push(sql`type = ${type}`)
+  if (type) conds.push(sql`${activityEvent}.type = ${type}`)
 
   return conds
 }
@@ -583,10 +586,12 @@ function activityToExplorerTx(row: Row) {
     functionName: functionNameForActivity(action),
     action,
     vesselId: tokenId,
+    craftType: row.craft_type == null ? null : String(row.craft_type),
     entry: row.entry == null && row.write_entry_index != null ? Number(row.write_entry_index) : row.entry == null ? null : Number(row.entry),
     detail: detailForActivity(action, tokenId, row),
     _action: action,
     _vesselId: tokenId,
+    _craftType: row.craft_type == null ? null : String(row.craft_type),
     _detail: detailForActivity(action, tokenId, row),
   }
 }

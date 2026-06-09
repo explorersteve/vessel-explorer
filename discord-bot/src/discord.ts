@@ -2,6 +2,7 @@ import type { VesselActivity } from './types.js'
 
 export interface DiscordEmbedPayload {
   embeds: Array<{
+    title: string
     description: string
     url: string
     image: { url: string }
@@ -23,6 +24,7 @@ export function buildDiscordPayload(
   return {
     embeds: [
       {
+        title: actionTitle(activity),
         description: `${sentenceForActivity(activity, actor)}\n\n${vesselUrl}`,
         url: vesselUrl,
         image: { url: imageUrl },
@@ -73,7 +75,7 @@ export function sentenceForActivity(activity: VesselActivity, actor = shortenAdd
   }
 
   const action = activitySentenceFragment(activity)
-  return `${actor} ${action} on #${activity.vesselId}`
+  return `**${escapeDiscordMarkdown(actor)}** ${action} on **${craftLabel(activity)} #${escapeDiscordMarkdown(activity.vesselId)}**`
 }
 
 function activitySentenceFragment(activity: VesselActivity) {
@@ -116,6 +118,18 @@ function writeFragment(activity: VesselActivity) {
 function roleFragment(detail: string) {
   const role = detail.match(/role\s+(\d+)/i)?.[1]
   return role ? `set role ${role}` : 'set role'
+}
+
+function actionTitle(activity: VesselActivity) {
+  return activity.action.toLowerCase()
+}
+
+function craftLabel(activity: VesselActivity) {
+  return escapeDiscordMarkdown((activity.craftType || 'craft').toLowerCase())
+}
+
+function escapeDiscordMarkdown(value: string) {
+  return value.replace(/([\\*_~`|<>])/g, '\\$1')
 }
 
 export function shortenAddress(address: string) {
