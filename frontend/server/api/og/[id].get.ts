@@ -16,6 +16,7 @@ const VESSEL_PAYLOAD_ABI = [
 
 let clientRpcUrl = ''
 let client: ReturnType<typeof createPublicClient> | null = null
+let emptyCraftImage: Uint8Array | null | undefined
 
 function getGridDimensions(tokenId: number) {
   const cols = Math.ceil(Math.sqrt(tokenId))
@@ -152,6 +153,26 @@ async function liveMachinePayload(event: H3Event, tokenId: number) {
   return typeof payload === 'string' ? payload as Hex : null
 }
 
+async function claimedEmptyCraftImage() {
+  if (emptyCraftImage !== undefined) return emptyCraftImage
+
+  const raw = await useStorage('assets:server')
+    .getItemRaw('claimed-empty-craft.jpg')
+    .catch(() => null)
+
+  if (raw == null) {
+    emptyCraftImage = null
+  } else if (typeof raw === 'string') {
+    emptyCraftImage = Buffer.from(raw)
+  } else if (raw instanceof ArrayBuffer) {
+    emptyCraftImage = new Uint8Array(raw)
+  } else {
+    emptyCraftImage = raw
+  }
+
+  return emptyCraftImage
+}
+
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id || isNaN(Number(id))) {
@@ -171,6 +192,18 @@ export default defineEventHandler(async (event) => {
       : null
     const pixels = hexToBytes(String(livePayload || token.payloadHex || '0x'))
     const colorMode = Number(token.colorMode || 0)
+
+    if (pixels.length === 0) {
+      const fallbackImage = await claimedEmptyCraftImage()
+      if (fallbackImage) {
+        setResponseHeaders(event, {
+          'Content-Type': 'image/jpeg',
+          'Cache-Control': 'public, max-age=86400',
+        })
+
+        return fallbackImage
+      }
+    }
 
     const png = buildPng(pixels, cols, rows, scale, colorMode)
 
