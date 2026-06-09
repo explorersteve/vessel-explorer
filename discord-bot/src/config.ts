@@ -51,7 +51,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     startMode,
     stateFile: env.STATE_FILE || DEFAULT_STATE_FILE,
     excludedEventTypes: commaSet(env.EXCLUDED_EVENT_TYPES || DEFAULT_EXCLUDED_EVENT_TYPES),
-    sendLatestOnStart: booleanEnv(env, 'SEND_LATEST_ON_START', true),
+    sendLatestOnStart: booleanEnv(env, 'SEND_LATEST_ON_START', false),
     dailySummaryEnabled: booleanEnv(env, 'DAILY_SUMMARY_ENABLED', true),
     dailySummaryTimeZone: env.DAILY_SUMMARY_TIMEZONE || DEFAULT_DAILY_SUMMARY_TIMEZONE,
     dailySummaryHour: boundedIntegerEnv(env, 'DAILY_SUMMARY_HOUR', DEFAULT_DAILY_SUMMARY_HOUR, 0, 23),

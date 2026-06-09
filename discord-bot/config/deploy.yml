@@ -31,7 +31,7 @@ env:
     START_MODE: '<%= ENV["START_MODE"] || "latest" %>'
     STATE_FILE: '<%= ENV["STATE_FILE"] || "/data/state.json" %>'
     EXCLUDED_EVENT_TYPES: '<%= ENV["EXCLUDED_EVENT_TYPES"] || "transfer,metadata" %>'
-    SEND_LATEST_ON_START: '<%= ENV["SEND_LATEST_ON_START"] || "true" %>'
+    SEND_LATEST_ON_START: '<%= ENV["SEND_LATEST_ON_START"] || "false" %>'
     DAILY_SUMMARY_ENABLED: '<%= ENV["DAILY_SUMMARY_ENABLED"] || "true" %>'
     DAILY_SUMMARY_TIMEZONE: '<%= ENV["DAILY_SUMMARY_TIMEZONE"] || "America/New_York" %>'
     DAILY_SUMMARY_HOUR: '<%= ENV["DAILY_SUMMARY_HOUR"] || "15" %>'
