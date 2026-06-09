@@ -81,6 +81,7 @@ export async function summarizeOnce(state: BotState): Promise<BotState> {
     },
     excludedEventTypes: activeConfig.excludedEventTypes,
     vesselBaseUrl: activeConfig.vesselBaseUrl,
+    gridCacheBust: shouldSendLatestSummaryOnStart ? String(Date.now()) : undefined,
     fetchActivities: (options) => fetchAllActivity(activeConfig.indexerUrl, options),
     fetchStats: () => fetchStats(activeConfig.indexerUrl),
     send: (payload) => sendWithRetry(activeConfig.discordWebhookUrl, payload),

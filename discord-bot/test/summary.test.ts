@@ -113,6 +113,21 @@ test('builds active daily summary embed with compact summary body', () => {
   assert.equal('footer' in embed!, false)
 })
 
+test('can cache-bust the daily grid image URL', () => {
+  const payload = buildDailySummaryPayload(
+    window106(),
+    [activity({ action: 'machine', hash: '0x01', vesselId: '5134' })],
+    stats,
+    'https://vessel.worldcomputer.art',
+    { gridCacheBust: 'machine-og-test' },
+  )
+
+  assert.equal(
+    payload.embeds[0]?.image?.url,
+    'https://vessel.worldcomputer.art/api/daily-grid?start=1780945200&end=1781031600&v=machine-og-test',
+  )
+})
+
 test('builds quiet daily summary embed without image or footer', () => {
   const payload = buildDailySummaryPayload(window106(), [], stats, 'https://vessel.worldcomputer.art')
   const embed = payload.embeds[0]

@@ -22,6 +22,7 @@ export interface ProcessDailySummaryOptions {
   schedule: SummarySchedule
   excludedEventTypes: Set<string>
   vesselBaseUrl: string
+  gridCacheBust?: string
   fetchActivities: (options: Omit<FetchActivityOptions, 'page'>) => Promise<VesselActivity[]>
   fetchStats: () => Promise<ProtocolStats>
   send: (payload: DiscordEmbedPayload) => Promise<void>
@@ -61,7 +62,9 @@ export async function processDailySummary(
   const activities = activityRows.filter((activity) =>
     isIncludedActivity(activity, options.excludedEventTypes),
   )
-  const payload = buildDailySummaryPayload(window, activities, stats, options.vesselBaseUrl)
+  const payload = buildDailySummaryPayload(window, activities, stats, options.vesselBaseUrl, {
+    gridCacheBust: options.gridCacheBust,
+  })
   await options.send(payload)
 
   const nextState = {
@@ -110,6 +113,7 @@ export function buildDailySummaryPayload(
   activities: VesselActivity[],
   stats: ProtocolStats,
   vesselBaseUrl: string,
+  options: { gridCacheBust?: string } = {},
 ): DiscordEmbedPayload {
   const vesselIds = new Set<string>()
   const actors = new Set<string>()
@@ -138,7 +142,7 @@ export function buildDailySummaryPayload(
         title: `Day ${window.dayNumber}`,
         description,
         ...(vesselIds.size > 0
-          ? { image: { url: dailyGridUrl(vesselBaseUrl, window) } }
+          ? { image: { url: dailyGridUrl(vesselBaseUrl, window, options.gridCacheBust) } }
           : {}),
       },
     ],
@@ -191,10 +195,13 @@ function actionLabel(action: string) {
   }
 }
 
-function dailyGridUrl(vesselBaseUrl: string, window: SummaryWindow) {
+function dailyGridUrl(vesselBaseUrl: string, window: SummaryWindow, cacheBust?: string) {
   const url = new URL('/api/daily-grid', trimTrailingSlash(vesselBaseUrl))
   url.searchParams.set('start', String(window.startTime))
   url.searchParams.set('end', String(window.endTime))
+  if (cacheBust) {
+    url.searchParams.set('v', cacheBust)
+  }
   return url.toString()
 }
 
