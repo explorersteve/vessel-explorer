@@ -122,29 +122,21 @@ export function buildDailySummaryPayload(
     actionCounts.set(action, (actionCounts.get(action) ?? 0) + 1)
   }
 
-  const fields = [
-    {
-      name: window.label,
-      value: activities.length > 0
-        ? `${formatNumber(activities.length)} interactions · ${formatNumber(vesselIds.size)} crafts touched · ${formatNumber(actors.size)} actors`
-        : 'No vessel interactions.',
-    },
-    {
-      name: 'Protocol',
-      value: protocolStatsValue(stats),
-    },
-  ]
-
-  const actions = actionCountsValue(actionCounts)
-  if (actions) {
-    fields.push({ name: 'Actions', value: actions })
-  }
+  const activitySummary = activities.length > 0
+    ? `${formatNumber(activities.length)} interactions · ${formatNumber(vesselIds.size)} crafts touched · ${formatNumber(actors.size)} actors`
+    : 'No vessel interactions.'
+  const actions = actionCountsDescription(actionCounts)
+  const description = [
+    activitySummary,
+    actions,
+    `***Protocol***\n${protocolStatsValue(stats)}`,
+  ].filter(Boolean).join('\n\n')
 
   return {
     embeds: [
       {
         title: `Day ${window.dayNumber}`,
-        fields,
+        description,
         ...(vesselIds.size > 0
           ? { image: { url: dailyGridUrl(vesselBaseUrl, window) } }
           : {}),
@@ -161,17 +153,42 @@ function protocolStatsValue(stats: ProtocolStats) {
   ].join('\n')
 }
 
-function actionCountsValue(actionCounts: Map<string, number>) {
+function actionCountsDescription(actionCounts: Map<string, number>) {
   return [...actionCounts.entries()]
-    .sort((a, b) => b[1] - a[1] || actionRank(a[0]) - actionRank(b[0]) || a[0].localeCompare(b[0]))
-    .map(([action, count]) => `${action} ${formatNumber(count)}`)
-    .join(' · ')
+    .sort((a, b) => actionRank(a[0]) - actionRank(b[0]) || a[0].localeCompare(b[0]))
+    .map(([action, count]) => `${actionLabel(action)}: ${formatNumber(count)}`)
+    .join('\n')
 }
 
 function actionRank(action: string) {
-  const order = ['write', 'claim', 'setvaultentry', 'machine', 'delegate']
+  const order = ['claim', 'write', 'setvaultentry', 'machine', 'delegate']
   const index = order.indexOf(action)
   return index === -1 ? order.length : index
+}
+
+function actionLabel(action: string) {
+  switch (action) {
+    case 'claim':
+      return 'Claims'
+    case 'write':
+      return 'Writes'
+    case 'setvaultentry':
+      return 'SetVaultEntries'
+    case 'machine':
+      return 'SetMachines'
+    case 'delegate':
+      return 'SetDelegates'
+    case 'approval':
+      return 'Approvals'
+    case 'approvalforall':
+      return 'ApprovalForAll'
+    case 'role':
+      return 'SetRoles'
+    case 'lock':
+      return 'LockClocks'
+    default:
+      return titleCase(action.replace(/[_-]+/g, ' '))
+  }
 }
 
 function dailyGridUrl(vesselBaseUrl: string, window: SummaryWindow) {
@@ -311,4 +328,11 @@ function formatNumber(value: number) {
 
 function trimTrailingSlash(value: string) {
   return value.replace(/\/+$/, '')
+}
+
+function titleCase(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
 }

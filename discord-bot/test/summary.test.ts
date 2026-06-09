@@ -85,7 +85,7 @@ test('does not force the same latest summary window twice', () => {
   )
 })
 
-test('builds active daily summary embed without description or footer', () => {
+test('builds active daily summary embed with compact summary body', () => {
   const payload = buildDailySummaryPayload(window106(), [
     activity({ action: 'write', hash: '0x01', vesselId: '2623', from: '0x0000000000000000000000000000000000000001' }),
     activity({ action: 'write', hash: '0x02', vesselId: '2623', from: '0x0000000000000000000000000000000000000002' }),
@@ -103,26 +103,27 @@ test('builds active daily summary embed without description or footer', () => {
 
   const embed = payload.embeds[0]
   assert.equal(embed?.title, 'Day 106')
-  assert.equal(embed?.fields?.[0]?.name, 'Jun 8, 3:00 PM - Jun 9, 3:00 PM ET')
-  assert.equal(embed?.fields?.[0]?.value, '12 interactions · 7 crafts touched · 5 actors')
-  assert.equal(embed?.fields?.[1]?.name, 'Protocol')
-  assert.equal(embed?.fields?.[1]?.value, '960 / 10,000 claimed · 428 filled · 159 holders\n528,782 / 1,134,080 bytes filled')
-  assert.equal(embed?.fields?.[2]?.name, 'Actions')
-  assert.equal(embed?.fields?.[2]?.value, 'write 6 · claim 2 · setvaultentry 2 · machine 1 · delegate 1')
+  assert.equal(embed?.description, [
+    '12 interactions · 7 crafts touched · 5 actors',
+    'Claims: 2\nWrites: 6\nSetVaultEntries: 2\nSetMachines: 1\nSetDelegates: 1',
+    '***Protocol***\n960 / 10,000 claimed · 428 filled · 159 holders\n528,782 / 1,134,080 bytes filled',
+  ].join('\n\n'))
   assert.equal(embed?.image?.url, 'https://vessel.worldcomputer.art/api/daily-grid?start=1780945200&end=1781031600')
-  assert.equal('description' in embed!, false)
+  assert.equal(embed?.fields, undefined)
   assert.equal('footer' in embed!, false)
 })
 
-test('builds quiet daily summary embed without image, description, or footer', () => {
+test('builds quiet daily summary embed without image or footer', () => {
   const payload = buildDailySummaryPayload(window106(), [], stats, 'https://vessel.worldcomputer.art')
   const embed = payload.embeds[0]
 
   assert.equal(embed?.title, 'Day 106')
-  assert.equal(embed?.fields?.length, 2)
-  assert.equal(embed?.fields?.[0]?.value, 'No vessel interactions.')
+  assert.equal(embed?.description, [
+    'No vessel interactions.',
+    '***Protocol***\n960 / 10,000 claimed · 428 filled · 159 holders\n528,782 / 1,134,080 bytes filled',
+  ].join('\n\n'))
+  assert.equal(embed?.fields, undefined)
   assert.equal(embed?.image, undefined)
-  assert.equal('description' in embed!, false)
   assert.equal('footer' in embed!, false)
 })
 
