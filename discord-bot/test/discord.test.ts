@@ -16,11 +16,17 @@ test('formats minimal activity sentences', () => {
 test('builds Discord embed with vessel link and OG image', () => {
   const payload = buildDiscordPayload(activity({ action: 'machine', vesselId: '5134' }), 'https://vessel.worldcomputer.art')
 
-  assert.equal(payload.embeds[0]?.title, 'machine')
-  assert.equal(payload.embeds[0]?.url, 'https://vessel.worldcomputer.art/5134')
+  assert.equal(payload.embeds[0]?.title, 'Machine set')
+  assert.equal(payload.embeds[0]?.url, 'https://evm.now/tx/0xhash')
   assert.equal(payload.embeds[0]?.image.url, 'https://vessel.worldcomputer.art/api/og/5134?v=25274501-machine-5134-1780943435')
   assert.match(payload.embeds[0]?.description || '', /\n\nhttps:\/\/vessel\.worldcomputer\.art\/5134/)
   assert.match(payload.embeds[0]?.description || '', /https:\/\/vessel\.worldcomputer\.art\/5134/)
+})
+
+test('builds human action titles', () => {
+  assert.equal(buildDiscordPayload(activity({ action: 'write', craftType: 'vault' }), 'https://vessel.worldcomputer.art').embeds[0]?.title, 'Vault write')
+  assert.equal(buildDiscordPayload(activity({ action: 'setvaultentry' }), 'https://vessel.worldcomputer.art').embeds[0]?.title, 'Vault entry set')
+  assert.equal(buildDiscordPayload(activity({ action: 'delegate' }), 'https://vessel.worldcomputer.art').embeds[0]?.title, 'Delegate set')
 })
 
 function activity(overrides: Partial<VesselActivity> = {}): VesselActivity {

@@ -26,7 +26,7 @@ export function buildDiscordPayload(
       {
         title: actionTitle(activity),
         description: `${sentenceForActivity(activity, actor)}\n\n${vesselUrl}`,
-        url: vesselUrl,
+        url: evmNowTxUrl(activity.hash),
         image: { url: imageUrl },
       },
     ],
@@ -121,7 +121,29 @@ function roleFragment(detail: string) {
 }
 
 function actionTitle(activity: VesselActivity) {
-  return activity.action.toLowerCase()
+  const action = activity.action.toLowerCase()
+  switch (action) {
+    case 'claim':
+      return 'Claimed'
+    case 'write':
+      return `${titleCase(activity.craftType || 'Craft')} write`
+    case 'machine':
+      return 'Machine set'
+    case 'delegate':
+      return 'Delegate set'
+    case 'setvaultentry':
+      return 'Vault entry set'
+    case 'approval':
+      return 'Approved'
+    case 'approvalforall':
+      return 'Approval for all'
+    case 'role':
+      return 'Role set'
+    case 'lock':
+      return 'Lock clock started'
+    default:
+      return titleCase(action.replace(/[_-]+/g, ' '))
+  }
 }
 
 function craftLabel(activity: VesselActivity) {
@@ -130,6 +152,13 @@ function craftLabel(activity: VesselActivity) {
 
 function escapeDiscordMarkdown(value: string) {
   return value.replace(/([\\*_~`|<>])/g, '\\$1')
+}
+
+function titleCase(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
 }
 
 export function shortenAddress(address: string) {
@@ -148,4 +177,8 @@ function imageVersion(activity: VesselActivity) {
     activity.vesselId,
     activity.timeStamp,
   ].join('-'))
+}
+
+function evmNowTxUrl(hash: string) {
+  return `https://evm.now/tx/${encodeURIComponent(hash)}`
 }
