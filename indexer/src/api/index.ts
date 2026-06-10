@@ -495,9 +495,12 @@ app.get('/work-units/transfers', async (c) => {
   const page = Math.max(1, Number(c.req.query('page')) || 1)
   const limit = Math.min(
     10_000,
-    Math.max(1, Number(c.req.query('offset') ?? c.req.query('limit')) || 1000),
+    Math.max(1, Number(c.req.query('limit')) || 1000),
   )
-  const offset = (page - 1) * limit
+  const requestedOffset = c.req.query('offset')
+  const offset = requestedOffset == null
+    ? (page - 1) * limit
+    : Math.max(0, Number(requestedOffset) || 0)
   const address = (c.req.query('address') || '').trim()
   const conds = []
   if (ADDRESS_PATTERN.test(address)) {
